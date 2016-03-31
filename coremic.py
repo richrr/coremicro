@@ -561,6 +561,7 @@ MAIN_PAGE_HTML = """\
 		Developed by Rodrigues RR and Williams MA, Virginia Tech. <br>
 		Acknowledgements: QIIME and GAE. <br>
 		This tool is free to use for non-profit or research purposes. <br>
+    See here for help section. <br>
 	</div>
 
   </body>
