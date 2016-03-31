@@ -83,6 +83,7 @@ from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import taskqueue
 from google.appengine.api import background_thread
 
+from google.appengine.ext import deferred
 
 # to do the parallelism: async, futures or mapreduce
 # https://cloud.google.com/appengine/docs/python/datastore/async#Working_with_the_Async_Datastore_API
@@ -576,16 +577,16 @@ class Guestbook(webapp2.RequestHandler):
     def post(self):
         #global DELIM, NTIMES, OUTPFILE
         DELIM = '\t'
-    	factor, group = self.request.get('group').split(':')
-    	NTIMES = int(self.request.get('random'))
-    	datetime = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
-    	## add a random alpha numeric to avoid conflict with another (simultaneous) user request.
-    	OUTPFILE = self.request.get('content') + datetime
+    	  factor, group = self.request.get('group').split(':')
+    	  NTIMES = int(self.request.get('random'))
+    	  datetime = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
+    	  ## add a random alpha numeric to avoid conflict with another (simultaneous) user request.
+    	  OUTPFILE = self.request.get('content') + datetime
     
-    	p_val_adj = self.request.get('pvaladjmethod')
+    	  p_val_adj = self.request.get('pvaladjmethod')
 
         otu_table_biom = self.request.get('datafile') #automatically reads file
-    	group_info = self.request.get('groupfile') #automatically reads file
+    	  group_info = self.request.get('groupfile') #automatically reads file
                 
         header_key="taxonomy"
         infile_txt = main_converter(otu_table_biom , header_key)
@@ -602,10 +603,35 @@ class Guestbook(webapp2.RequestHandler):
         ndb_custom_key_o = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
         OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), idx= ndb_custom_key_o, biom = otu_table_biom).put()
 
+        '''
         taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o,
         "factor" : factor, "group" : group, "g_info_not_list" : group_info,
         "p_val_adj" : p_val_adj, "ntimes": NTIMES, "delim" : DELIM, "outpfile" : OUTPFILE
         })
+        '''
+        
+        
+        deferred.defer(calc_significance, otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE)
+        '''
+        otu_table_biom_o = self.request.get("otu_table_biom_key")
+        factor = self.request.get("factor")
+        group = self.request.get("group")
+        g_info_not_list = self.request.get("g_info_not_list")  ### check if this is a list or not
+        g_info_list = g_info_not_list.split('\n')
+        p_val_adj = self.request.get("p_val_adj")
+        NTIMES = int(self.request.get("ntimes"))
+        DELIM = self.request.get("delim")
+        OUTPFILE = self.request.get("outpfile")
+        
+
+        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
+        
+        
+        for q in qry_entries_in_origbiom:
+            q_dict = q.to_dict()
+            otu_table_biom = q_dict['biom']
+            calc_significance, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE)
+        '''
         
         self.redirect('/')
         
