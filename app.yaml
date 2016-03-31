@@ -1,0 +1,33 @@
+application: coremic
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+# this line may not be required
+includes:
+- mapreduce/include.yaml
+
+# top to bottom priority
+handlers:
+# the following mapreduce code may not be required
+- url: /mapreduce/.*
+  script: google.appengine.ext.mapreduce.main.APP
+  login: admin
+
+- url: /stylesheets
+  static_dir: stylesheets
+
+- url: /.*
+  script: coremic.app
+
+libraries:
+- name: webapp2
+  version: "2.5.2"
+- name: jinja2
+  version: "2.6"
+- name: numpy
+  version: "1.6.1"
+- name: matplotlib
+  version: "1.2.0"
+
