@@ -589,24 +589,23 @@ class Guestbook(webapp2.RequestHandler):
         
         to_email = self.request.get('email')
         
-        '''  #this can be deleted
         OriginalBiom(id='origbiom').put()  # the datastore of original biom
         ndb_custom_key_o = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
         OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), idx= ndb_custom_key_o, biom = otu_table_biom).put()
-        '''
+
+        taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o,
+        "factor" : factor, "group" : group, "g_info_not_list" : group_info,
+        "p_val_adj" : p_val_adj, "ntimes": NTIMES, "delim" : DELIM, "outpfile" : OUTPFILE,
+        "to_email" : to_email
+        })
         
-        # deferred runs the mapreduce job in the background, so the mapreduce state is never captured
-        # and it never ends
-        deferred.defer(calc_significance, otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
-        
-        #calc_significance (otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
+        #self.redirect('/')
         
         dump_content = "Thanks for using this tool. Your results will be emailed at %s" %to_email
         self.response.write('<html><body>Sit back and realx!<pre>')
         self.response.write(dump_content)
         self.response.write('</pre></body></html>')
 
-        #self.redirect('/')
         
 
 class ProcessData(webapp2.RequestHandler):
@@ -621,23 +620,14 @@ class ProcessData(webapp2.RequestHandler):
         NTIMES = int(self.request.get("ntimes"))
         DELIM = self.request.get("delim")
         OUTPFILE = self.request.get("outpfile")
-        
+        to_email = self.request.get("to_email")
 
         qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
-        #dump_content = "Your data from Timestamp %s--Original Biom Count--%s" %(OUTPFILE, qry_entries_in_origbiom.count())
         
         for q in qry_entries_in_origbiom:
             q_dict = q.to_dict()
             otu_table_biom = q_dict['biom']
-            #try:
-            #dump_content = calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE)
-            calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE)
-            #    break
-            #except DeadlineExceededError:
-            #    dump_content = "Deadline error"
-            #    logging.warning(dump_content)
-        
-        #tid = background_thread.start_new_background_thread(calc_significance, [otu_table_biom, factor, group, group_info.split('\n'), p_val_adj])
+            calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
 
 
 

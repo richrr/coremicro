@@ -4,9 +4,6 @@ runtime: python27
 api_version: 1
 threadsafe: true
 
-builtins:
-- deferred: on
-- appstats: on
 
 # this line may not be required
 includes:
@@ -25,9 +22,6 @@ handlers:
 - url: /.*
   script: coremic.app
 
-- url: /_ah/queue/deferred
-  script: google.appengine.ext.deferred.deferred.application
-  login: optional
 
 
 libraries:
