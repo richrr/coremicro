@@ -189,9 +189,9 @@ def get_sample_ids(map_data, map_header, states):
 def exec_core_microb_cmd(infile, output_dir, mapping_info_list, categ, group):
     #cmd = 'compute_core_microbiome.py -i %s -o %s --mapping_fp %s --valid_states "%s:%s"' %(infile, out_dir, new_mapping_file, categ, group)
     
-    min_fraction_for_core = 0.9 # change this to 0.5 or 0.75 if needed
+    min_fraction_for_core = 0.75 # change this to 0.5 or 0.75 or 0.9 if needed
     max_fraction_for_core = 1.0
-    num_fraction_for_core_steps = 3  # change this to 11 if it is 0.5 above; 6 if 0.75 above
+    num_fraction_for_core_steps = 6  # change this to 11 if it is 0.5 above; 6 if 0.75 above; 3 if 0.9 above
     
     fractions_for_core = linspace(min_fraction_for_core,
                                   max_fraction_for_core,
