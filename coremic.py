@@ -96,8 +96,6 @@ from google.appengine.api import background_thread
 #"filters": [("idx", "=", ndb_custom_key)]
 class ShuffleDictPipeline(base_handler.PipelineBase):
   def run(self, ndb_custom_key, otu_table_biom):
-    print "I SEE YOU"
-    '''
     output = yield mapreduce_pipeline.MapperPipeline(
       "calc_shuff_core_microb",
       "coremic.shuffle_dict_coremic_map",
@@ -118,7 +116,7 @@ class ShuffleDictPipeline(base_handler.PipelineBase):
     #print output
     #with pipeline.After(output):
     yield CloudStorageWriter(output)
-    '''
+
 
 class ResultFile(ndb.Model):
   file_name = ndb.StringProperty()
@@ -169,7 +167,7 @@ def shuffle_dict_coremic_map(entity):
     '''
     ctx = context.get()
     params = ctx.mapreduce_spec.mapper.params
-    print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputMon-07-Mar-2016-11:27:48-AM~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
+    #print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputMon-07-Mar-2016-11:27:48-AM~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
     ndb_custom_key = params['input_reader']["ndb_custom_key"]
     otu_table_biom = params['input_reader']["otu_table_biom"]
     #print otu_table_biom
@@ -178,8 +176,8 @@ def shuffle_dict_coremic_map(entity):
      get the randomized dict and run core microbiome
     '''    
     entty = entity.to_dict()
-    print ndb_custom_key , 'aaaaaaaaaaaaaaa'
-    print entty['idx'] , 'AAAAAAAAAAAAAAAA'
+    #print ndb_custom_key , 'aaaaaaaaaaaaaaa'
+    #print entty['idx'] , 'AAAAAAAAAAAAAAAA'
     r_out_str = ''
     if entty['idx'] == ndb_custom_key:
         rand_mapping_info_dict = entty['dict']
@@ -327,8 +325,8 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     #print qry_entries_in_rand_dict.count()
 
     ## using mapreduce to parallelize the core microbiome on random dicts
-    shuffled_core_mic = ShuffleDictPipeline()#ndb_custom_key, otu_table_biom) 
-    #shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
+    #shuffled_core_mic = ShuffleDictPipeline()#ndb_custom_key, otu_table_biom) 
+    shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
     shuffled_core_mic.start()
 
 
@@ -368,7 +366,7 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
         ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
        
         qry_entries_in_result_rand_dict = Result_RandomDict.query(Result_RandomDict.frac_thresh == ndb_custom_key_qury_id, ancestor=ndb.Key(Result_RandomDict, 'fatherresults'))  
-        print 'xxxxxxxxxxxxx' , qry_entries_in_result_rand_dict.count()
+        #print 'xxxxxxxxxxxxx' , qry_entries_in_result_rand_dict.count()
 
         # compile the results from randomization
         # this returns a list of list i.e. collects the unique set of core taxa from each randomized data
@@ -596,11 +594,13 @@ class Guestbook(webapp2.RequestHandler):
         ndb_custom_key_o = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
         OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), idx= ndb_custom_key_o, biom = otu_table_biom).put()
 
+        '''
         taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o,
         "factor" : factor, "group" : group, "g_info_not_list" : group_info,
         "p_val_adj" : p_val_adj, "ntimes": NTIMES, "delim" : DELIM, "outpfile" : OUTPFILE,
         "to_email" : to_email
         })
+        '''
         
         #self.redirect('/')
         
@@ -609,6 +609,7 @@ class Guestbook(webapp2.RequestHandler):
         self.response.write(dump_content)
         self.response.write('</pre></body></html>')
 
+        calc_significance(otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
         
 
 class ProcessData(webapp2.RequestHandler):
