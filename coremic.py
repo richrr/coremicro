@@ -628,6 +628,7 @@ class ProcessData(webapp2.RequestHandler):
             q_dict = q.to_dict()
             otu_table_biom = q_dict['biom']
             calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
+            
 
 
 
