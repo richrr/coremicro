@@ -330,9 +330,9 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
 
 
     # this keeps the below code from running until mapreduce is finished    
-    time.sleep(55)
+    #time.sleep(55)
     
-    '''
+    
     # Later on, see if it's done.
     my_pipeline = shuffled_core_mic.pipeline_id
     shuffled_core_mic = ShuffleDictPipeline.from_id(my_pipeline)
@@ -349,7 +349,7 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
         time.sleep(30)
 
     print "........Done Waiting........."
-    '''
+
      
     '''
     the following section compiles results from the Result Datatstore and calculates stats.
