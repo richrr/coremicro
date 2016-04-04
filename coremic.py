@@ -65,7 +65,6 @@ from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.api import app_identity
 '''
 from mapreduce import base_handler
-
 from mapreduce import mapreduce_pipeline
 from mapreduce import operation as op
 from mapreduce import shuffler
@@ -83,7 +82,7 @@ from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import taskqueue
 from google.appengine.api import background_thread
 
-from google.appengine.ext import deferred
+#from google.appengine.ext import deferred
 
 # to do the parallelism: async, futures or mapreduce
 # https://cloud.google.com/appengine/docs/python/datastore/async#Working_with_the_Async_Datastore_API
@@ -97,6 +96,8 @@ from google.appengine.ext import deferred
 #"filters": [("idx", "=", ndb_custom_key)]
 class ShuffleDictPipeline(base_handler.PipelineBase):
   def run(self, ndb_custom_key, otu_table_biom):
+    print "I SEE YOU"
+    '''
     output = yield mapreduce_pipeline.MapperPipeline(
       "calc_shuff_core_microb",
       "coremic.shuffle_dict_coremic_map",
@@ -117,7 +118,7 @@ class ShuffleDictPipeline(base_handler.PipelineBase):
     #print output
     #with pipeline.After(output):
     yield CloudStorageWriter(output)
-
+    '''
 
 class ResultFile(ndb.Model):
   file_name = ndb.StringProperty()
@@ -168,7 +169,7 @@ def shuffle_dict_coremic_map(entity):
     '''
     ctx = context.get()
     params = ctx.mapreduce_spec.mapper.params
-    #print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputMon-07-Mar-2016-11:27:48-AM~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
+    print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputMon-07-Mar-2016-11:27:48-AM~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
     ndb_custom_key = params['input_reader']["ndb_custom_key"]
     otu_table_biom = params['input_reader']["otu_table_biom"]
     #print otu_table_biom
@@ -176,7 +177,9 @@ def shuffle_dict_coremic_map(entity):
     '''
      get the randomized dict and run core microbiome
     '''    
-    entty = entity.to_dict()    
+    entty = entity.to_dict()
+    print ndb_custom_key , 'aaaaaaaaaaaaaaa'
+    print entty['idx'] , 'AAAAAAAAAAAAAAAA'
     r_out_str = ''
     if entty['idx'] == ndb_custom_key:
         rand_mapping_info_dict = entty['dict']
@@ -323,9 +326,9 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     #qry_entries_in_rand_dict = RandomDict.query(RandomDict.idx == ndb_custom_key, ancestor=ndb.Key(RandomDict, 'father'))  
     #print qry_entries_in_rand_dict.count()
 
-
     ## using mapreduce to parallelize the core microbiome on random dicts
-    shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
+    shuffled_core_mic = ShuffleDictPipeline()#ndb_custom_key, otu_table_biom) 
+    #shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
     shuffled_core_mic.start()
 
 
