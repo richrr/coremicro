@@ -113,18 +113,18 @@ class ShuffleDictPipeline(base_handler.PipelineBase):
           "bucket_name": "coremicrobucket"
         }
       },
-      shards=200)
+      shards=5) #200
     #print output
     #with pipeline.After(output):
     yield CloudStorageWriter(output)
 
 
-
 class ResultFile(ndb.Model):
   file_name = ndb.StringProperty()
   date = ndb.DateTimeProperty(auto_now_add=True)
-  
 
+
+## this is useless information for now, fix it or delete it
 class CloudStorageWriter(base_handler.PipelineBase):
     def run(self, csv_output):
       # Store all the file names
@@ -139,6 +139,7 @@ class RandomDict(ndb.Model):
   idx = ndb.StringProperty() # the run id
   entry_id = ndb.StringProperty() # the entry along with the run id
   dict = ndb.JsonProperty() # the (shuffled) dictionary as a json
+
 
 ## for every random dict entry, it has different thresholds
 # the actual key is automatically generated
@@ -161,7 +162,6 @@ def divide_list(a, lengths):
     return a[:lengths[0]] , a[lengths[0]:]  # a[start:end] # items start through end-1
 
 
-
 def shuffle_dict_coremic_map(entity):
     '''
      get the params and any information that was passed
@@ -181,7 +181,6 @@ def shuffle_dict_coremic_map(entity):
     if entty['idx'] == ndb_custom_key:
         rand_mapping_info_dict = entty['dict']
         OUTPFILE, c, group, rand_iter_numb = entty['entry_id'].split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-        #print OUTPFILE, c, group, rand_iter_numb
         rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
         rand_o_dir = rand_iter_numb + OUTPFILE
         result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
@@ -202,25 +201,33 @@ def shuffle_dict_coremic_map(entity):
                      entry_id = ndb_custom_key_r_frac_thres_entry, \
                      otus = r_OTUs, biom = r_biom).put()
 
-    #print 'XXXXXXXXXXX', r_out_str
-    #yield r_out_str
-
     yield '1' ## change this to something useful
 
-def shuffle_dicts(iternumb, a): ## takes iternumb which is number of random iteration and dictionary
+
+def shuffle_dicts(a): ## takes dictionary
     keys = a.keys() #If items(), keys(), values() are called with no intervening modifications to the dictionary, the lists will directly correspond.
+    values, lengths = get_values_from_dict(a)
+    random.shuffle(values)
+    new_values = divide_list(values, lengths)
+    categ_samples_dict_shuffled = dict(zip(keys, new_values))
+    return categ_samples_dict_shuffled
+
+
+def check_map_file_has_two_groups(a): ## takes iternumb which is number of random iteration and dictionary
+    values, lengths = get_values_from_dict(a)
+    if len(lengths) > 2:
+        return "No"
+    return "Yes"
+
+
+def get_values_from_dict(a):
     values = list()
     lengths = list()
     for i in a.values():
         v = i.split(',')
         values.extend(v)
         lengths.append(len(v)) # sizes of original lists
-    random.shuffle(values)
-    if len(lengths) > 2:
-        return '\nFollowing code divides samples in TWO groups. Change the mapping file to only have two groups (e.g. A vs D)\n'
-    new_values = divide_list(values, lengths)
-    categ_samples_dict_shuffled = dict(zip(keys, new_values))
-    return categ_samples_dict_shuffled
+    return values, lengths 
 
 
 def compile_results(otus, DELIM): # get unique elements from last column (otus)
@@ -240,36 +247,48 @@ def calc_freq_elem_list(a):
     return counter
 
 
-def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE):
+def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
     # find index of SampleID and category to be summarized  # e.g. swg or non-swg
-    #return mapping_info_list
     labels = mapping_info_list[0].split(DELIM)
     indx_sampleid = indx_categ = ''
+
+    errors_list = ()
 
     try: # this is from the mapping file
         indx_sampleid = labels.index("#SampleID")
     except ValueError:
-        return "'#SampleID' not in the headers of the sample <-> group info file"
+        errors_list.append("'#SampleID' not in the headers of the sample <-> group info file")
 
     try:
         indx_categ = labels.index(c)
     except ValueError:
-        return "'%s' not in the headers of the sample <-> group info file" %c
+        errors_list.append("'%s' not in the headers of the sample <-> group info file" %c)
+
+    # check to see if the mapping file (factor or category) has more than two groups
+    categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',', "current", indx_categ, indx_sampleid)
+    if check_map_file_has_two_groups(categ_samples_dict) == "No":
+        errors_list.append('\nERROR: Following code divides samples in TWO groups. Change the mapping file to only have two groups (e.g. A vs D)\n')
+
+    #global ndb_custom_key
+    ndb_custom_key = OUTPFILE + '~~~~' + c + '~~~~' + group  # this is to query all entries in this run
+    user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s\n# of randomizations: %s\n\n\n'  %(c, group, p_val_adj, NTIMES)
+
+    if len(errors_list) > 0: # email the error and quit, no point to continue further
+        send_results_as_email(ndb_custom_key, user_args, '\n'.join(errors_list), to_email)
+        return 1
 
     # run core microbiome on original data
     o_dir = 'true_result' + OUTPFILE
     result = exec_core_microb_cmd(otu_table_biom, o_dir, mapping_info_list, c, group) 
-    # Access the result dict with the following keys 'fractions_for_core' , 'otu_counts' , 'frac_thresh_core_OTUs_biom'
+    # result dict has following keys 'fractions_for_core' , 'otu_counts' , 'frac_thresh_core_OTUs_biom'
 
     out_str = ''
-    true_result_frac_thresh_otus_dict = dict() # compile original
+    true_result_frac_thresh_otus_dict = dict() # compile original results. The key is frac_threshold, value is a list of unique otus
     for frac_thresh , core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
-        OTUs , biom = core_OTUs_biom
-        out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (frac_thresh, ''.join(OTUs), biom)
-        #print frac_thresh
+        OTUs , biom = core_OTUs_biom # this is a tuple of otus and biom
+        #out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (frac_thresh, ''.join(OTUs), biom)
         true_result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs, DELIM)
 
-    categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',', "current", indx_categ, indx_sampleid)
    
     ''' 
     temporary hack to clear out the Datastore
@@ -278,7 +297,7 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
     ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
     ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
-    ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
+    #ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
 
     
     '''
@@ -288,10 +307,8 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     #http://stackoverflow.com/questions/14630886/ndb-and-consistency-why-is-happening-this-behavior-in-a-query-without-a-parent
     RandomDict(id='father').put()  # the datastore of random dicts
 
-    #global ndb_custom_key
-    ndb_custom_key = OUTPFILE + '~~~~' + c + '~~~~' + group  # this is to query all entries in this run
     for i in range(NTIMES):
-        shuffled_dict = shuffle_dicts(i, categ_samples_dict)
+        shuffled_dict = shuffle_dicts(categ_samples_dict)
         ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
         RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
 
@@ -305,38 +322,17 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     # query entries with same ndb_custom_key
     #qry_entries_in_rand_dict = RandomDict.query(RandomDict.idx == ndb_custom_key, ancestor=ndb.Key(RandomDict, 'father'))  
     #print qry_entries_in_rand_dict.count()
-    #for qry in qry_entries_in_rand_dict:
-    '''
-        entty = qry.to_dict()
-        #print entty['idx'] #entty['dict']
-        rand_mapping_info_dict = entty['dict']
-        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
-        rand_iter_numb = entty['entry_id'].split('~~~~')[-1] # last element from list
-        rand_o_dir = rand_iter_numb + OUTPFILE
-        # double check with if condition to see that the random dict are used for the correct run
-        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group) 
-        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
-            r_OTUs , r_biom = r_core_OTUs_biom
-            r_out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs), r_biom)
-            
-            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
-            ndb_custom_key_r_frac_thres_entry = ndb_custom_key_r_frac_thres + '~~~~' + rand_iter_numb
 
 
-            Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
-                     idx= ndb_custom_key, frac_thresh = ndb_custom_key_r_frac_thres, \
-                     entry_id = ndb_custom_key_r_frac_thres_entry, \
-                     otus = r_OTUs, biom = r_biom).put()
-    '''
- 
-    
     ## using mapreduce to parallelize the core microbiome on random dicts
     shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
     shuffled_core_mic.start()
 
 
     # this keeps the below code from running until mapreduce is finished    
-    #time.sleep(55)
+    time.sleep(55)
+    
+    '''
     # Later on, see if it's done.
     my_pipeline = shuffled_core_mic.pipeline_id
     shuffled_core_mic = ShuffleDictPipeline.from_id(my_pipeline)
@@ -353,45 +349,35 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
         time.sleep(30)
 
     print "........Done Waiting........."
-
+    '''
      
     '''
     the following section compiles results from the Result Datatstore and calculates stats.
     '''
-  
 
     sign_results = 'Significant results:\nOTU\tFreq. in randomized data\tpval=freq/times randomizeds\t%s corrected pval\n' %p_val_adj
     p_val = 0.05 
 
-    
     # compile results; print the number of random occurances for each true core microbiome otu (checks significance)
-    #for frac_s in [75, 80, 85, 90, 95, 100]:
-    for frac_s in [100]:
+    for frac_s in [75, 80, 85, 90, 95, 100]:#for frac_s in [100]:
         sign_results += '#Frac thresh %s\n' % str(frac_s)
         
         ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
        
         qry_entries_in_result_rand_dict = Result_RandomDict.query(Result_RandomDict.frac_thresh == ndb_custom_key_qury_id, ancestor=ndb.Key(Result_RandomDict, 'fatherresults'))  
-        #print 'xxxxxxxxxxxxx' , qry_entries_in_result_rand_dict.count()
+        print 'xxxxxxxxxxxxx' , qry_entries_in_result_rand_dict.count()
 
         # compile the results from randomization
         # this returns a list of list i.e. collects the unique set of core taxa from each randomized data
         taxons_ = list()
         for q in qry_entries_in_result_rand_dict:
-            #print res
             res = q.to_dict()
-            #print res['otus']
             taxons_.append(compile_results(res['otus'], DELIM))
             
         all_results_otu_list = [item for sublist in taxons_ for item in sublist] #  taxons_ -> sublist -> item
 
         # calculate freq of otu being a core microb from the randomizations
         randomized_otus = calc_freq_elem_list(all_results_otu_list) # dict of otus and freq of occurance from random data
-        """
-        #print the compiled results from randomized runs of core microbiomes
-        for k, v in randomized_otus.items():
-        	sign_results += "%s\t%s\n" % (k , v)
-        """
 
         # check significance
         signif_core_microb_otu_dict = collections.OrderedDict()
@@ -404,21 +390,22 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
                     #sign_results += otu
                     signif_core_microb_otu_dict[o] = otus_pval
 
-
         # check if there is at least one significant entry so far:
         if len(signif_core_microb_otu_dict) == 0:
             continue # go to next iteration
-        else: 
+        else:
             pass    
-        
-        # adjsut the pvalues of significant otus for multiple testing
+
+        print signif_core_microb_otu_dict.values()
+        # adjust the pvalues of significant otus for multiple testing
         new_p_vals = list()
         if p_val_adj == 'bf':
             new_p_vals = correct_pvalues_for_multiple_testing(signif_core_microb_otu_dict.values(), "Bonferroni")
         elif p_val_adj == 'bh':
             new_p_vals = correct_pvalues_for_multiple_testing(signif_core_microb_otu_dict.values(), "Benjamini-Hochberg")
-        elif p_val_adj == 'None':
+        elif p_val_adj == 'none':
             new_p_vals = signif_core_microb_otu_dict.values()
+
         
         counter = 0
         for o in signif_core_microb_otu_dict.keys():
@@ -431,18 +418,20 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
             counter += 1
 
     
-    user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s\n# of randomizations: %s\n\n\n'  %(c, group, p_val_adj, NTIMES)
-    send_results_as_email(ndb_custom_key, user_args, sign_results)
+    print sign_results
+    send_results_as_email(ndb_custom_key, user_args, sign_results, to_email)
     return sign_results #r_out_str #result['otu_counts'] # '1'
 
 
-def send_results_as_email(timestmp, user_args, msg):
+# the user id needs to be changed to that input by the user
+def send_results_as_email(timestmp, user_args, msg, to_email):
     subj = "Your data from %s has been processed" %timestmp
     message = mail.EmailMessage(sender="Core microbiome Support <richieangel@gmail.com>",
                             subject=subj)
 
-    message.to = "User <richrr@vt.edu>" #Albert Johnson <Albert.Johnson@example.com>
-    
+    email_to_ =  "User <" + to_email + ">" #"User <richrr@vt.edu>" #Albert Johnson <Albert.Johnson@example.com>
+    message.to = email_to_
+
     msg_str = """
 Dear User:
 
@@ -495,7 +484,9 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
                 new_values[i+1] = new_values[i]                                                           
         for i, vals in enumerate(values):
             pvalue, index = vals
-            new_pvalues[index] = new_values[i]                                                                                                                  
+            new_pvalues[index] = new_values[i]
+    elif correction_type == "None":
+        new_pvalues = 1 * pvalues                                                                                         
     return new_pvalues
 
 
@@ -511,6 +502,9 @@ def convert_shuffled_dict_to_str(DICT, categ):
 
     return file_str_list
 
+
+def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
 
 
 
@@ -578,75 +572,42 @@ class Guestbook(webapp2.RequestHandler):
     def post(self):
         #global DELIM, NTIMES, OUTPFILE
         DELIM = '\t'
-    	  factor, group = self.request.get('group').split(':')
-    	  NTIMES = int(self.request.get('random'))
-    	  datetime = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
-    	  ## add a random alpha numeric to avoid conflict with another (simultaneous) user request.
-    	  OUTPFILE = self.request.get('content') + datetime
-    
-    	  p_val_adj = self.request.get('pvaladjmethod')
+    	factor, group = self.request.get('group').split(':')
+    	NTIMES = int(self.request.get('random'))
+    	datetime = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
+    	
+    	## added a random alpha numeric to avoid conflict with another (simultaneous) user request.
+        OUTPFILE = self.request.get('content') + datetime + id_generator()
+
+    	p_val_adj = self.request.get('pvaladjmethod')
 
         otu_table_biom = self.request.get('datafile') #automatically reads file
-    	  group_info = self.request.get('groupfile') #automatically reads file
+    	group_info = self.request.get('groupfile') #automatically reads file
                 
         header_key="taxonomy"
         infile_txt = main_converter(otu_table_biom , header_key)
         
         to_email = self.request.get('email')
-
-        dump_content = "Thanks for using this tool. Your results will be emailed at %s" %to_email
-        #dump_content = cgi.escape(otu_table_biom)  +  "\n" + cgi.escape(group_info) 
-        #self.response.write('<html><body>You wrote:<pre>')
-        #self.response.write(dump_content)
-        #self.response.write('</pre></body></html>')
         
+        '''  #this can be deleted
         OriginalBiom(id='origbiom').put()  # the datastore of original biom
         ndb_custom_key_o = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
         OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), idx= ndb_custom_key_o, biom = otu_table_biom).put()
+        '''
+        
+        # deferred runs the mapreduce job in the background, so the mapreduce state is never captured
+        # and it never ends
+        deferred.defer(calc_significance, otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
+        
+        #calc_significance (otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
+        
+        dump_content = "Thanks for using this tool. Your results will be emailed at %s" %to_email
+        self.response.write('<html><body>Sit back and realx!<pre>')
+        self.response.write(dump_content)
+        self.response.write('</pre></body></html>')
 
-        '''
-        taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o,
-        "factor" : factor, "group" : group, "g_info_not_list" : group_info,
-        "p_val_adj" : p_val_adj, "ntimes": NTIMES, "delim" : DELIM, "outpfile" : OUTPFILE
-        })
-        '''
+        #self.redirect('/')
         
-        
-        deferred.defer(calc_significance, otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE)
-        '''
-        otu_table_biom_o = self.request.get("otu_table_biom_key")
-        factor = self.request.get("factor")
-        group = self.request.get("group")
-        g_info_not_list = self.request.get("g_info_not_list")  ### check if this is a list or not
-        g_info_list = g_info_not_list.split('\n')
-        p_val_adj = self.request.get("p_val_adj")
-        NTIMES = int(self.request.get("ntimes"))
-        DELIM = self.request.get("delim")
-        OUTPFILE = self.request.get("outpfile")
-        
-
-        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
-        
-        
-        for q in qry_entries_in_origbiom:
-            q_dict = q.to_dict()
-            otu_table_biom = q_dict['biom']
-            calc_significance, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE)
-        '''
-        
-        self.redirect('/')
-        
-        '''
-        dump_content = 'Error'
-
-        try:
-            dump_content = calc_significance(otu_table_biom, factor, group, group_info.split('\n'), p_val_adj)    
-        except DeadlineExceededError:
-            logging.warning("Deadline error")
-
-        #tid = background_thread.start_new_background_thread(calc_significance, [otu_table_biom, factor, group, group_info.split('\n'), p_val_adj])
-        send_results_as_email(OUTPFILE, dump_content)
-        '''
 
 class ProcessData(webapp2.RequestHandler):
     def post(self):
