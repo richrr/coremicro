@@ -82,6 +82,8 @@ from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import taskqueue
 from google.appengine.api import background_thread
 
+from google.appengine.ext.blobstore import BlobKey
+
 #from google.appengine.ext import deferred
 
 # to do the parallelism: async, futures or mapreduce
@@ -92,6 +94,14 @@ from google.appengine.api import background_thread
 
 #http://stackoverflow.com/questions/11849456/how-to-filter-datastore-data-before-mapping-to-cloud-storage-using-the-mapreduce
 #http://stackoverflow.com/questions/23508116/appengine-mapreduce-how-to-filter-structuredproperty-while-using-datastore-input
+
+# This datastore model keeps track of which users uploaded which photos.
+class UserPhoto(ndb.Model):
+    request_id = ndb.StringProperty()
+    otu_table_biom_blob_key = ndb.BlobKeyProperty()
+    group_info_blob_key = ndb.BlobKeyProperty()
+    params_str = ndb.JsonProperty()
+
 
 #"filters": [("idx", "=", ndb_custom_key)]
 class ShuffleDictPipeline(base_handler.PipelineBase):
@@ -167,7 +177,7 @@ def shuffle_dict_coremic_map(entity):
     '''
     ctx = context.get()
     params = ctx.mapreduce_spec.mapper.params
-    #print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputMon-07-Mar-2016-11:27:48-AM~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
+    #print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputTue-05-Apr-2016-11:31:08-PM43MDJ2~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
     ndb_custom_key = params['input_reader']["ndb_custom_key"]
     otu_table_biom = params['input_reader']["otu_table_biom"]
     #print otu_table_biom
@@ -253,7 +263,7 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     labels = mapping_info_list[0].split(DELIM)
     indx_sampleid = indx_categ = ''
 
-    errors_list = ()
+    errors_list = list()
 
     try: # this is from the mapping file
         indx_sampleid = labels.index("#SampleID")
@@ -265,10 +275,11 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     except ValueError:
         errors_list.append("'%s' not in the headers of the sample <-> group info file" %c)
 
+    print 'I see you' , indx_categ, indx_sampleid
     # check to see if the mapping file (factor or category) has more than two groups
     categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',', "current", indx_categ, indx_sampleid)
     if check_map_file_has_two_groups(categ_samples_dict) == "No":
-        errors_list.append('\nERROR: Following code divides samples in TWO groups. Change the mapping file to only have two groups (e.g. A vs D)\n')
+        errors_list.append('\nERROR: Following code divides samples in >TWO groups. Change the mapping file to only have two groups (e.g. A vs D)\n')
 
     #global ndb_custom_key
     ndb_custom_key = OUTPFILE + '~~~~' + c + '~~~~' + group  # this is to query all entries in this run
@@ -356,7 +367,7 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     the following section compiles results from the Result Datatstore and calculates stats.
     '''
 
-    sign_results = 'Significant results:\nOTU\tFreq. in randomized data\tpval=freq/times randomizeds\t%s corrected pval\n' %p_val_adj
+    sign_results = 'Significant results:\nOTU\tFreq. in randomized data\tpval=freq/times randomized\t%s corrected pval\n' %p_val_adj
     p_val = 0.05 
 
     # compile results; print the number of random occurances for each true core microbiome otu (checks significance)
@@ -512,7 +523,7 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
 MAIN_PAGE_HTML = """\
 <html>
   <body>
-    <form action="/sign" enctype="multipart/form-data" method="post">
+    <form action="{0}" enctype="multipart/form-data" method="post">
     <b> 'Calculate significance of core microbiome' </b>
 	<p>
 		Type some text to use for your output (if you like):<br>
@@ -566,11 +577,17 @@ MAIN_PAGE_HTML = """\
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
-        self.response.write(MAIN_PAGE_HTML)
+        upload_url = blobstore.create_upload_url('/sign')
+        self.response.write(MAIN_PAGE_HTML.format(upload_url))
 
 
-class Guestbook(webapp2.RequestHandler):
+class Guestbook(blobstore_handlers.BlobstoreUploadHandler,webapp2.RequestHandler):
     def post(self):
+        otu_table_biom = self.get_uploads()[0]
+        group_info = self.get_uploads()[1]
+        
+        print self.get_uploads()
+        
         #global DELIM, NTIMES, OUTPFILE
         DELIM = '\t'
     	factor, group = self.request.get('group').split(':')
@@ -582,65 +599,81 @@ class Guestbook(webapp2.RequestHandler):
 
     	p_val_adj = self.request.get('pvaladjmethod')
 
-        otu_table_biom = self.request.get('datafile') #automatically reads file
-    	group_info = self.request.get('groupfile') #automatically reads file
-                
-        header_key="taxonomy"
-        infile_txt = main_converter(otu_table_biom , header_key)
-        
         to_email = self.request.get('email')
-        
-        OriginalBiom(id='origbiom').put()  # the datastore of original biom
-        ndb_custom_key_o = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
-        OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), idx= ndb_custom_key_o, biom = otu_table_biom).put()
 
-        '''
-        taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o,
-        "factor" : factor, "group" : group, "g_info_not_list" : group_info,
-        "p_val_adj" : p_val_adj, "ntimes": NTIMES, "delim" : DELIM, "outpfile" : OUTPFILE,
-        "to_email" : to_email
-        })
-        '''
-        
-        #self.redirect('/')
-        
-        dump_content = "Thanks for using this tool. Your results will be emailed at %s" %to_email
-        self.response.write('<html><body>Sit back and realx!<pre>')
-        self.response.write(dump_content)
-        self.response.write('</pre></body></html>')
+        # make a dict and insert in ndb as a json property
+        local_string_hack_dict = { "otu_table_biom_key" : str(otu_table_biom.key()), 
+                     "group_key" : str(group_info.key()), 
+                     "factor" : factor, 
+                     "group" : group, 
+                     "p_val_adj" : p_val_adj, 
+                     "delim" : DELIM, 
+                     "ntimes" : str(NTIMES), 
+                     "outpfile" : OUTPFILE, 
+                     "to_email" : to_email }
+            
+        UserPhoto(id='UserPhoto').put()  # the datastore of original biom
+        UserPhoto(parent=ndb.Key(UserPhoto, 'UserPhoto'), 
+                request_id= OUTPFILE,
+                otu_table_biom_blob_key=otu_table_biom.key(),
+                group_info_blob_key=group_info.key(),
+                params_str=local_string_hack_dict).put()
 
-        calc_significance(otu_table_biom, factor, group, group_info.split('\n'), p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
+        self.redirect('/process_data/%s' % otu_table_biom.key())
+
+class ProcessData(blobstore_handlers.BlobstoreDownloadHandler):
+    def get(self, photo_key):
+        qry_entries_in_origbiom = UserPhoto.query(UserPhoto.otu_table_biom_blob_key == BlobKey(photo_key), ancestor=ndb.Key(UserPhoto, 'UserPhoto'))
         
-
-class ProcessData(webapp2.RequestHandler):
-    def post(self):
-        #global DELIM, NTIMES, OUTPFILE
-        otu_table_biom_o = self.request.get("otu_table_biom_key")
-        factor = self.request.get("factor")
-        group = self.request.get("group")
-        g_info_not_list = self.request.get("g_info_not_list")  ### check if this is a list or not
-        g_info_list = g_info_not_list.split('\n')
-        p_val_adj = self.request.get("p_val_adj")
-        NTIMES = int(self.request.get("ntimes"))
-        DELIM = self.request.get("delim")
-        OUTPFILE = self.request.get("outpfile")
-        to_email = self.request.get("to_email")
-
-        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
+        if int(qry_entries_in_origbiom.count()) == 1:
+            pass
+        else:
+            # do something useful here
+            pass
         
         for q in qry_entries_in_origbiom:
             q_dict = q.to_dict()
-            otu_table_biom = q_dict['biom']
-            calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email)
+            
+            params = q_dict['params_str']  # this is a dictionary
+            factor = params["factor"]
+            group = params["group"]
+            p_val_adj = params["p_val_adj"]
+            DELIM = params["delim"]
+            NTIMES = str(params["ntimes"])
+            OUTPFILE = params["outpfile"]
+            to_email = params["to_email"]
+            
+            otu_table_biom_key = q_dict['otu_table_biom_blob_key']
+            group_info_key = q_dict['group_info_blob_key']
+            #print otu_table_biom_key , '\n', group_info_key
+            
+            # read contents of the blob
+            blob_reader = blobstore.BlobReader(otu_table_biom_key)
+            otu_table_biom = blob_reader.read()
+            blob_reader.close()
+        
+            # read contents of the blob
+            blob_reader = blobstore.BlobReader(group_info_key)
+            g_info_list = blob_reader.readlines()
+            blob_reader.close()
             
 
+            '''
+            for i in [otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email]:
+                print i
+            '''
+            calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+            #self.send_blob(photo_key)
+
+
+        
 
 
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/sign', Guestbook),
-    ('/process_data', ProcessData),
+    ('/process_data/([^/]+)?', ProcessData),
 ], debug=True)
 
 
