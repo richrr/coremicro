@@ -122,7 +122,7 @@ class ShuffleDictPipeline(base_handler.PipelineBase):
           "bucket_name": "coremicrobucket"
         }
       },
-      shards=5) #200
+      shards=250) #200
     #print output
     #with pipeline.After(output):
     yield CloudStorageWriter(output)
@@ -258,7 +258,8 @@ def calc_freq_elem_list(a):
     return counter
 
 
-def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
+
+def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
     # find index of SampleID and category to be summarized  # e.g. swg or non-swg
     labels = mapping_info_list[0].split(DELIM)
     indx_sampleid = indx_categ = ''
@@ -275,43 +276,23 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
     except ValueError:
         errors_list.append("'%s' not in the headers of the sample <-> group info file" %c)
 
-    print 'I see you' , indx_categ, indx_sampleid
-    # check to see if the mapping file (factor or category) has more than two groups
-    categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',', "current", indx_categ, indx_sampleid)
-    if check_map_file_has_two_groups(categ_samples_dict) == "No":
-        errors_list.append('\nERROR: Following code divides samples in >TWO groups. Change the mapping file to only have two groups (e.g. A vs D)\n')
+    return (indx_sampleid , indx_categ , errors_list)
 
-    #global ndb_custom_key
-    ndb_custom_key = OUTPFILE + '~~~~' + c + '~~~~' + group  # this is to query all entries in this run
-    user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s\n# of randomizations: %s\n\n\n'  %(c, group, p_val_adj, NTIMES)
 
-    if len(errors_list) > 0: # email the error and quit, no point to continue further
-        send_results_as_email(ndb_custom_key, user_args, '\n'.join(errors_list), to_email)
-        return 1
-
-    # run core microbiome on original data
+# run core microbiome on original data
+def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM):
     o_dir = 'true_result' + OUTPFILE
     result = exec_core_microb_cmd(otu_table_biom, o_dir, mapping_info_list, c, group) 
     # result dict has following keys 'fractions_for_core' , 'otu_counts' , 'frac_thresh_core_OTUs_biom'
 
-    out_str = ''
     true_result_frac_thresh_otus_dict = dict() # compile original results. The key is frac_threshold, value is a list of unique otus
     for frac_thresh , core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
         OTUs , biom = core_OTUs_biom # this is a tuple of otus and biom
-        #out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (frac_thresh, ''.join(OTUs), biom)
         true_result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs, DELIM)
+    return true_result_frac_thresh_otus_dict
 
-   
-    ''' 
-    temporary hack to clear out the Datastore
-    http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
-    '''
-    ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
-    ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
-    ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
-    #ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
 
-    
+def create_shuffled_dicts(NTIMES, categ_samples_dict, ndb_custom_key):
     '''
     The following section creates shuffled dictionaries and puts them in datastore
     '''
@@ -323,8 +304,41 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
         shuffled_dict = shuffle_dicts(categ_samples_dict)
         ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
         RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
+    return 1
+
+
+def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
+
+    #global ndb_custom_key
+    ndb_custom_key = OUTPFILE + '~~~~' + c + '~~~~' + group  # this is to query all entries in this run
+    user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s\n# of randomizations: %s\n\n\n'  %(c, group, p_val_adj, NTIMES)
+
+
+    categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',', "current", indx_categ, indx_sampleid)
+    
+    if check_map_file_has_two_groups(categ_samples_dict) == "No":
+        errors_list.append('\nERROR: Following code divides samples in >TWO groups. Change the mapping file to only have two groups (e.g. A vs D)\n')
+
+
+    if len(errors_list) > 0: # email the error and quit, no point to continue further
+        send_results_as_email(ndb_custom_key, user_args, '\n'.join(errors_list), to_email)
 
     
+    out_str = ''
+    true_result_frac_thresh_otus_dict = run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM)
+    
+    ''' 
+    temporary hack to clear out the Datastore     http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
+    '''
+    ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
+    ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
+    ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
+    ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
+
+
+    create_shuffled_dicts(NTIMES, categ_samples_dict, ndb_custom_key)
+
+
     '''
     The following section calculates core microbiome for each shuffled dictionaries and puts the
     results in the result datastore
@@ -408,7 +422,7 @@ def calc_significance(otu_table_biom, c, group, mapping_info_list, p_val_adj, DE
         else:
             pass    
 
-        print signif_core_microb_otu_dict.values()
+        #print signif_core_microb_otu_dict.values()
         # adjust the pvalues of significant otus for multiple testing
         new_p_vals = list()
         if p_val_adj == 'bf':
@@ -657,12 +671,26 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler):
             g_info_list = blob_reader.readlines()
             blob_reader.close()
             
+            indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+            if len(errors_list) > 0: # temp hack since blobstore randomly swaps file order during upload
+                tmp = g_info_list
+                g_info_list = otu_table_biom
+                otu_table_biom = tmp
+                # retry with swapped files
+                indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+                if len(errors_list) > 0: # just give up on this
+                    print '\n'.join(errors_list)
+                    sys.exit(0)
+                else:
+                    print 'Swapping files worked!'
+
+            print g_info_list
 
             '''
             for i in [otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email]:
                 print i
             '''
-            calc_significance(otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+            calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
             #self.send_blob(photo_key)
 
 
