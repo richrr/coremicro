@@ -675,10 +675,20 @@ class Guestbook(blobstore_handlers.BlobstoreUploadHandler,webapp2.RequestHandler
                 group_info_blob_key=group_info.key(),
                 params_str=local_string_hack_dict).put()
 
-        self.redirect('/process_data/%s' % otu_table_biom.key())
+        #self.redirect('/process_data/%s' % otu_table_biom.key())
+        
+        taskqueue.add(url="/process_data", params={'otu_table_biom_key': otu_table_biom.key()})
+        
+        self.redirect('/')
+        
 
-class ProcessData(blobstore_handlers.BlobstoreDownloadHandler):
+class ProcessData(blobstore_handlers.BlobstoreDownloadHandler,webapp2.RequestHandler):
+    def post(self):
+        #global DELIM, NTIMES, OUTPFILE
+        photo_key = self.request.get("otu_table_biom_key")
+        '''
     def get(self, photo_key):
+        '''
         qry_entries_in_origbiom = UserPhoto.query(UserPhoto.otu_table_biom_blob_key == BlobKey(photo_key), ancestor=ndb.Key(UserPhoto, 'UserPhoto'))
         
         if int(qry_entries_in_origbiom.count()) == 1:
@@ -746,7 +756,8 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler):
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/sign', Guestbook),
-    ('/process_data/([^/]+)?', ProcessData),
+    #('/process_data/([^/]+)?', ProcessData),
+    ('/process_data', ProcessData),
 ], debug=True)
 
 
