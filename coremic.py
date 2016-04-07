@@ -215,6 +215,41 @@ def shuffle_dict_coremic_map(entity):
     yield '1' ## change this to something useful
 
 
+def shuffle_dict_coremic_serial(entity, ndb_custom_key, otu_table_biom):
+    '''
+     get the randomized dict and run core microbiome
+    '''    
+    entty = entity.to_dict()
+    #print ndb_custom_key , 'aaaaaaaaaaaaaaa'
+    #print entty['idx'] , 'AAAAAAAAAAAAAAAA'
+    r_out_str = ''
+    if entty['idx'] == ndb_custom_key:
+        rand_mapping_info_dict = entty['dict']
+        OUTPFILE, c, group, rand_iter_numb = entty['entry_id'].split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
+        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
+        rand_o_dir = rand_iter_numb + OUTPFILE
+        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
+
+        '''
+         arrange the results to look pretty
+        '''
+        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
+            r_OTUs , r_biom = r_core_OTUs_biom
+            #r_out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs), r_biom)
+            #r_out_str += "Frac Threshold %s:\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs))
+            
+            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
+            ndb_custom_key_r_frac_thres_entry = ndb_custom_key_r_frac_thres + '~~~~' + rand_iter_numb
+
+            Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
+                     idx= ndb_custom_key, frac_thresh = ndb_custom_key_r_frac_thres, \
+                     entry_id = ndb_custom_key_r_frac_thres_entry, \
+                     otus = r_OTUs, biom = r_biom).put()
+
+    yield '1' ## change this to something useful
+
+
+
 def shuffle_dicts(a): ## takes dictionary
     keys = a.keys() #If items(), keys(), values() are called with no intervening modifications to the dictionary, the lists will directly correspond.
     values, lengths = get_values_from_dict(a)
@@ -322,6 +357,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
 
     if len(errors_list) > 0: # email the error and quit, no point to continue further
         send_results_as_email(ndb_custom_key, user_args, '\n'.join(errors_list), to_email)
+        # put code here so that the code doesn't run further
 
     
     out_str = ''
@@ -345,10 +381,16 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     '''
  
     Result_RandomDict(id='fatherresults').put() # the datastore of results from random dicts
+    r_out_str = ''
     # query entries with same ndb_custom_key
-    #qry_entries_in_rand_dict = RandomDict.query(RandomDict.idx == ndb_custom_key, ancestor=ndb.Key(RandomDict, 'father'))  
+    qry_entries_in_rand_dict = RandomDict.query(RandomDict.idx == ndb_custom_key, ancestor=ndb.Key(RandomDict, 'father'))  
     #print qry_entries_in_rand_dict.count()
 
+    for qry in qry_entries_in_rand_dict:
+        shuffle_dict_coremic_serial(qry, ndb_custom_key, otu_table_biom)
+
+
+    '''
     ## using mapreduce to parallelize the core microbiome on random dicts
     #shuffled_core_mic = ShuffleDictPipeline()#ndb_custom_key, otu_table_biom) 
     shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
@@ -375,7 +417,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         time.sleep(30)
 
     print "........Done Waiting........."
-
+    '''
      
     '''
     the following section compiles results from the Result Datatstore and calculates stats.
@@ -680,6 +722,7 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler):
                 indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
                 if len(errors_list) > 0: # just give up on this
                     print '\n'.join(errors_list)
+                    # put code here so that the code doesn't run further
                     sys.exit(0)
                 else:
                     print 'Swapping files worked!'
