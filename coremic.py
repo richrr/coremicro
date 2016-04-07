@@ -82,6 +82,8 @@ from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import taskqueue
 from google.appengine.api import background_thread
 
+from google.appengine.api.taskqueue import TaskRetryOptions
+
 from google.appengine.ext.blobstore import BlobKey
 
 #from google.appengine.ext import deferred
@@ -164,6 +166,7 @@ class Result_RandomDict(ndb.Model):
 class OriginalBiom(ndb.Model):
   idx = ndb.StringProperty() # the run id
   biom = ndb.JsonProperty() # the core biom from the original input as a json
+  params_str = ndb.JsonProperty()
 
 
 # this cane be changed later to allow splitting in more than two groups
@@ -215,13 +218,12 @@ def shuffle_dict_coremic_map(entity):
     yield '1' ## change this to something useful
 
 
-def shuffle_dict_coremic_serial(entity, ndb_custom_key, otu_table_biom):
+def shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom):
     '''
      get the randomized dict and run core microbiome
     '''    
-    entty = entity.to_dict()
-    #print ndb_custom_key , 'aaaaaaaaaaaaaaa'
-    #print entty['idx'] , 'AAAAAAAAAAAAAAAA'
+    print ndb_custom_key , 'aaaaaaaaaaaaaaa'
+    print entty['idx'] , 'AAAAAAAAAAAAAAAA'
     r_out_str = ''
     if entty['idx'] == ndb_custom_key:
         rand_mapping_info_dict = entty['dict']
@@ -246,7 +248,7 @@ def shuffle_dict_coremic_serial(entity, ndb_custom_key, otu_table_biom):
                      entry_id = ndb_custom_key_r_frac_thres_entry, \
                      otus = r_OTUs, biom = r_biom).put()
 
-    yield '1' ## change this to something useful
+    return '1' ## change this to something useful
 
 
 
@@ -362,6 +364,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     
     out_str = ''
     true_result_frac_thresh_otus_dict = run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM)
+    print "Processed %s fraction thresholds for true data" % str(len(true_result_frac_thresh_otus_dict))
     
     ''' 
     temporary hack to clear out the Datastore     http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
@@ -371,7 +374,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
     ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
 
-
+    print "Creating shuffled dicts"
     create_shuffled_dicts(NTIMES, categ_samples_dict, ndb_custom_key)
 
 
@@ -379,15 +382,20 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     The following section calculates core microbiome for each shuffled dictionaries and puts the
     results in the result datastore
     '''
- 
+    print "Performing analysis on randomized data"
     Result_RandomDict(id='fatherresults').put() # the datastore of results from random dicts
     r_out_str = ''
     # query entries with same ndb_custom_key
     qry_entries_in_rand_dict = RandomDict.query(RandomDict.idx == ndb_custom_key, ancestor=ndb.Key(RandomDict, 'father'))  
-    #print qry_entries_in_rand_dict.count()
+    print "Number of random dictionaries found" , qry_entries_in_rand_dict.count()
+
+    #print qry_entries_in_rand_dict
 
     for qry in qry_entries_in_rand_dict:
-        shuffle_dict_coremic_serial(qry, ndb_custom_key, otu_table_biom)
+        #print "Processing a random dict"
+        entty = qry.to_dict()
+        #print entty
+        shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom)
 
 
     '''
@@ -423,6 +431,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     the following section compiles results from the Result Datatstore and calculates stats.
     '''
 
+    print "Compiling results"
     sign_results = 'Significant results:\nOTU\tFreq. in randomized data\tpval=freq/times randomized\t%s corrected pval\n' %p_val_adj
     p_val = 0.05 
 
@@ -462,7 +471,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         if len(signif_core_microb_otu_dict) == 0:
             continue # go to next iteration
         else:
-            pass    
+            print "There are %s signif core microb without corrections"  % str(len(signif_core_microb_otu_dict))
 
         #print signif_core_microb_otu_dict.values()
         # adjust the pvalues of significant otus for multiple testing
@@ -633,16 +642,19 @@ MAIN_PAGE_HTML = """\
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
-        upload_url = blobstore.create_upload_url('/sign')
+        upload_url = '/sign'
         self.response.write(MAIN_PAGE_HTML.format(upload_url))
 
 
-class Guestbook(blobstore_handlers.BlobstoreUploadHandler,webapp2.RequestHandler):
+#class Guestbook(blobstore_handlers.BlobstoreUploadHandler,webapp2.RequestHandler):
+class Guestbook(webapp2.RequestHandler):
     def post(self):
-        otu_table_biom = self.get_uploads()[0]
-        group_info = self.get_uploads()[1]
+        #otu_table_biom = self.get_uploads()[0]
+        #group_info = self.get_uploads()[1]
+        otu_table_biom = self.request.get('datafile') #automatically reads file
+    	group_info = self.request.get('groupfile') #automatically reads file
         
-        print self.get_uploads()
+        #print self.get_uploads()
         
         #global DELIM, NTIMES, OUTPFILE
         DELIM = '\t'
@@ -657,9 +669,11 @@ class Guestbook(blobstore_handlers.BlobstoreUploadHandler,webapp2.RequestHandler
 
         to_email = self.request.get('email')
 
+        ndb_custom_key_o = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
+
         # make a dict and insert in ndb as a json property
-        local_string_hack_dict = { "otu_table_biom_key" : str(otu_table_biom.key()), 
-                     "group_key" : str(group_info.key()), 
+        local_string_hack_dict = { "otu_table_biom_key" : ndb_custom_key_o, 
+                     "g_info_not_list" : group_info, 
                      "factor" : factor, 
                      "group" : group, 
                      "p_val_adj" : p_val_adj, 
@@ -668,38 +682,37 @@ class Guestbook(blobstore_handlers.BlobstoreUploadHandler,webapp2.RequestHandler
                      "outpfile" : OUTPFILE, 
                      "to_email" : to_email }
             
-        UserPhoto(id='UserPhoto').put()  # the datastore of original biom
-        UserPhoto(parent=ndb.Key(UserPhoto, 'UserPhoto'), 
-                request_id= OUTPFILE,
-                otu_table_biom_blob_key=otu_table_biom.key(),
-                group_info_blob_key=group_info.key(),
-                params_str=local_string_hack_dict).put()
 
-        #self.redirect('/process_data/%s' % otu_table_biom.key())
+        OriginalBiom(id='origbiom').put()  # the datastore of original biom
+        OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), 
+            idx= ndb_custom_key_o, biom = otu_table_biom, params_str=local_string_hack_dict).put()
+
         
-        taskqueue.add(url="/process_data", params={'otu_table_biom_key': otu_table_biom.key()})
+        taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o},
+                 retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
+                countdown=1)
         
         self.redirect('/')
         
 
-class ProcessData(blobstore_handlers.BlobstoreDownloadHandler,webapp2.RequestHandler):
+class ProcessData(webapp2.RequestHandler):
     def post(self):
-        #global DELIM, NTIMES, OUTPFILE
-        photo_key = self.request.get("otu_table_biom_key")
+        otu_table_biom_o = self.request.get("otu_table_biom_key")
         '''
     def get(self, photo_key):
         '''
-        qry_entries_in_origbiom = UserPhoto.query(UserPhoto.otu_table_biom_blob_key == BlobKey(photo_key), ancestor=ndb.Key(UserPhoto, 'UserPhoto'))
+        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
         
         if int(qry_entries_in_origbiom.count()) == 1:
-            pass
+            print "Read single entry from OriginalBiom datastore!"
         else:
             # do something useful here
-            pass
+            print "Single entry not found from OriginalBiom datastore, some error!"
         
         for q in qry_entries_in_origbiom:
+            print "Running 1st attempt"
             q_dict = q.to_dict()
-            
+           
             params = q_dict['params_str']  # this is a dictionary
             factor = params["factor"]
             group = params["group"]
@@ -709,19 +722,9 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler,webapp2.RequestHan
             OUTPFILE = params["outpfile"]
             to_email = params["to_email"]
             
-            otu_table_biom_key = q_dict['otu_table_biom_blob_key']
-            group_info_key = q_dict['group_info_blob_key']
-            #print otu_table_biom_key , '\n', group_info_key
-            
-            # read contents of the blob
-            blob_reader = blobstore.BlobReader(otu_table_biom_key)
-            otu_table_biom = blob_reader.read()
-            blob_reader.close()
-        
-            # read contents of the blob
-            blob_reader = blobstore.BlobReader(group_info_key)
-            g_info_list = blob_reader.readlines()
-            blob_reader.close()
+            otu_table_biom = q_dict['biom']        
+             
+            g_info_list = params["g_info_not_list"].split('\n')
             
             indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
             if len(errors_list) > 0: # temp hack since blobstore randomly swaps file order during upload
@@ -739,14 +742,9 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler,webapp2.RequestHan
             else:
                 print 'No file swapping needed!'
 
-            #print g_info_list
+            #print 'OTU' , otu_table_biom, '\n', 'GINFO', g_info_list
 
-            '''
-            for i in [otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email]:
-                print i
-            '''
             calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
-            #self.send_blob(photo_key)
 
 
         
@@ -756,7 +754,6 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler,webapp2.RequestHan
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/sign', Guestbook),
-    #('/process_data/([^/]+)?', ProcessData),
     ('/process_data', ProcessData),
 ], debug=True)
 
