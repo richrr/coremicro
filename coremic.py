@@ -683,8 +683,10 @@ class ProcessData(blobstore_handlers.BlobstoreDownloadHandler):
                     sys.exit(0)
                 else:
                     print 'Swapping files worked!'
+            else:
+                print 'No file swapping needed!'
 
-            print g_info_list
+            #print g_info_list
 
             '''
             for i in [otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email]:
