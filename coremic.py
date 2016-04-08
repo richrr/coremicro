@@ -222,8 +222,8 @@ def shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom):
     '''
      get the randomized dict and run core microbiome
     '''    
-    print ndb_custom_key , 'aaaaaaaaaaaaaaa'
-    print entty['idx'] , 'AAAAAAAAAAAAAAAA'
+    #print ndb_custom_key , 'aaaaaaaaaaaaaaa'
+    #print entty['idx'] , 'AAAAAAAAAAAAAAAA'
     r_out_str = ''
     if entty['idx'] == ndb_custom_key:
         rand_mapping_info_dict = entty['dict']
@@ -391,11 +391,18 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
 
     #print qry_entries_in_rand_dict
 
+    counter = 1
     for qry in qry_entries_in_rand_dict:
         #print "Processing a random dict"
         entty = qry.to_dict()
         #print entty
         shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom)
+        ### write code to start a taskqueue from time to time to start compiling the results
+        ### while the dictionaries are being processed.
+        if counter % 100 == 0:
+            print counter
+        counter += 1
+        
 
 
     '''
