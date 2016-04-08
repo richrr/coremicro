@@ -391,6 +391,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
 
     #print qry_entries_in_rand_dict
 
+    
     counter = 1
     for qry in qry_entries_in_rand_dict:
         #print "Processing a random dict"
@@ -402,6 +403,14 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         if counter % 100 == 0:
             print counter
         counter += 1
+    
+    '''
+    other options to try out (if we are limited by 10 mins deadline):
+     - get rid of the datastore entries (this is definitely moving away from mapreduce which was more datastore dependent code)
+     - start taskqueue from time to time to start compiling the results while dicts are being processed
+     - try mapreduce
+     - try basic or manual scaling https://cloud.google.com/appengine/docs/python/modules/
+    '''
         
 
 
