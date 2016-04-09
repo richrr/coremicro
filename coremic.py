@@ -465,9 +465,9 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
      - try mapreduce
      - try basic or manual scaling https://cloud.google.com/appengine/docs/python/modules/
     '''
-        
+    compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
 
-
+def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES):
      
     '''
     the following section compiles results from the Result Datatstore and calculates stats.
@@ -733,7 +733,10 @@ class Guestbook(webapp2.RequestHandler):
         OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), 
             idx= ndb_custom_key_o, biom = otu_table_biom, params_str=local_string_hack_dict).put()
 
-        
+        # try to break the randomizations into n tasks of 100 randomizations each and then run them one by one
+        # finally run the significance calculation
+        # might have to first move the sign calc to a separate method
+        # http://stackoverflow.com/questions/4224564/calling-a-script-after-tasks-queue-is-empty  
         taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o},
                  retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
                 countdown=1)
