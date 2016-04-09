@@ -222,8 +222,6 @@ def shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom):
     '''
      get the randomized dict and run core microbiome
     '''    
-    #print ndb_custom_key , 'aaaaaaaaaaaaaaa'
-    #print entty['idx'] , 'AAAAAAAAAAAAAAAA'
     r_out_str = ''
     if entty['idx'] == ndb_custom_key:
         rand_mapping_info_dict = entty['dict']
@@ -237,8 +235,6 @@ def shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom):
         '''
         for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
             r_OTUs , r_biom = r_core_OTUs_biom
-            #r_out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs), r_biom)
-            #r_out_str += "Frac Threshold %s:\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs))
             
             ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
             ndb_custom_key_r_frac_thres_entry = ndb_custom_key_r_frac_thres + '~~~~' + rand_iter_numb
@@ -249,6 +245,36 @@ def shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom):
                      otus = r_OTUs, biom = r_biom).put()
 
     return '1' ## change this to something useful
+
+
+def shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom):
+    '''
+     get the randomized dict and run core microbiome
+    '''    
+    r_out_str = ''
+    local_dict_frac_thresh_otus = dict()
+    if entty['idx'] == ndb_custom_key:
+        rand_mapping_info_dict = entty['dict']
+        OUTPFILE, c, group, rand_iter_numb = entty['entry_id'].split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
+        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
+        rand_o_dir = rand_iter_numb + OUTPFILE
+        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
+
+        '''
+         arrange the results to look pretty
+        '''
+        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
+            r_OTUs , r_biom = r_core_OTUs_biom
+            
+            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
+            
+            if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
+                print "Why do you have same fraction thresholds repeating?"
+                #local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres].append(r_OTUs)
+            else:
+                local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = r_OTUs
+
+    return local_dict_frac_thresh_otus ## change this to something useful
 
 
 
@@ -391,18 +417,25 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
 
     #print qry_entries_in_rand_dict
 
-    
+    glob_qry_entries_in_result_rand_dict =  dict()
     counter = 1
     for qry in qry_entries_in_rand_dict:
         #print "Processing a random dict"
         entty = qry.to_dict()
         #print entty
-        shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom)
+        local_dict_frac_thresh_otus = shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom)
         ### write code to start a taskqueue from time to time to start compiling the results
         ### while the dictionaries are being processed.
         if counter % 100 == 0:
             print counter
         counter += 1
+        
+        for ndb_custom_key_r_frac_thres , r_OTUs in local_dict_frac_thresh_otus.items():
+            if ndb_custom_key_r_frac_thres in glob_qry_entries_in_result_rand_dict:
+                glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres].append(r_OTUs)
+            else:
+                glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
+
     
     '''
     other options to try out (if we are limited by 10 mins deadline):
@@ -456,18 +489,22 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         sign_results += '#Frac thresh %s\n' % str(frac_s)
         
         ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
-       
-        qry_entries_in_result_rand_dict = Result_RandomDict.query(Result_RandomDict.frac_thresh == ndb_custom_key_qury_id, ancestor=ndb.Key(Result_RandomDict, 'fatherresults'))  
-        #print 'xxxxxxxxxxxxx' , qry_entries_in_result_rand_dict.count()
+        
+        # this number should be equal to the number of randomizations
+        # qry_entries_in_result_rand_dict is a list of list, the internal list is tab-delimited OTU# and OTU name
+        qry_entries_in_result_rand_dict = glob_qry_entries_in_result_rand_dict[ndb_custom_key_qury_id]
+        print 'Number of results from randomized dict = ' , len(qry_entries_in_result_rand_dict)
+        #print qry_entries_in_result_rand_dict
 
         # compile the results from randomization
-        # this returns a list of list i.e. collects the unique set of core taxa from each randomized data
+        # this returns a list of list i.e. collects the unique set of core taxa (OTU name) from each randomized data
         taxons_ = list()
         for q in qry_entries_in_result_rand_dict:
-            res = q.to_dict()
-            taxons_.append(compile_results(res['otus'], DELIM))
-            
+            taxons_.append(compile_results(q, DELIM))
+        #print taxons_
+        
         all_results_otu_list = [item for sublist in taxons_ for item in sublist] #  taxons_ -> sublist -> item
+        #print all_results_otu_list
 
         # calculate freq of otu being a core microb from the randomizations
         randomized_otus = calc_freq_elem_list(all_results_otu_list) # dict of otus and freq of occurance from random data
@@ -511,7 +548,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
             counter += 1
 
     
-    print sign_results
+    #print sign_results
     send_results_as_email(ndb_custom_key, user_args, sign_results, to_email)
     return sign_results #r_out_str #result['otu_counts'] # '1'
 
