@@ -277,7 +277,6 @@ def shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom):
     return local_dict_frac_thresh_otus ## change this to something useful
 
 
-
 def shuffle_dicts(a): ## takes dictionary
     keys = a.keys() #If items(), keys(), values() are called with no intervening modifications to the dictionary, the lists will directly correspond.
     values, lengths = get_values_from_dict(a)
@@ -369,6 +368,46 @@ def create_shuffled_dicts(NTIMES, categ_samples_dict, ndb_custom_key):
         RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
     return 1
 
+def create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, otu_table_biom):
+        '''
+        The following section creates shuffled dictionaries and puts them in datastore
+        '''
+
+        shuffled_dict = shuffle_dicts(categ_samples_dict)
+        ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
+        local_dict_frac_thresh_otus = shuffle_dict_coremic_serial_dict_no_datastore(shuffled_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom)
+        
+        #RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
+        return local_dict_frac_thresh_otus
+
+def shuffle_dict_coremic_serial_dict_no_datastore(rand_mapping_info_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom):
+        '''
+        get the randomized dict and run core microbiome
+        '''    
+
+        local_dict_frac_thresh_otus = dict()
+
+        OUTPFILE, c, group, rand_iter_numb = ndb_custom_key_entry.split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
+        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
+        rand_o_dir = rand_iter_numb + OUTPFILE
+        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
+
+        '''
+         arrange the results to look pretty
+        '''
+        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
+            r_OTUs , r_biom = r_core_OTUs_biom
+            
+            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
+            
+            if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
+                print "Why do you have same fraction thresholds repeating?"
+                #local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres].append(r_OTUs)
+            else:
+                local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = r_OTUs
+
+        return local_dict_frac_thresh_otus ## change this to something useful
+
 
 def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
 
@@ -400,32 +439,13 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
     ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
 
-    print "Creating shuffled dicts"
-    create_shuffled_dicts(NTIMES, categ_samples_dict, ndb_custom_key)
-
-
-    '''
-    The following section calculates core microbiome for each shuffled dictionaries and puts the
-    results in the result datastore
-    '''
-    print "Performing analysis on randomized data"
-    Result_RandomDict(id='fatherresults').put() # the datastore of results from random dicts
-    r_out_str = ''
-    # query entries with same ndb_custom_key
-    qry_entries_in_rand_dict = RandomDict.query(RandomDict.idx == ndb_custom_key, ancestor=ndb.Key(RandomDict, 'father'))  
-    print "Number of random dictionaries found" , qry_entries_in_rand_dict.count()
-
-    #print qry_entries_in_rand_dict
-
     glob_qry_entries_in_result_rand_dict =  dict()
     counter = 1
-    for qry in qry_entries_in_rand_dict:
-        #print "Processing a random dict"
-        entty = qry.to_dict()
-        #print entty
-        local_dict_frac_thresh_otus = shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom)
-        ### write code to start a taskqueue from time to time to start compiling the results
-        ### while the dictionaries are being processed.
+
+    print "Creating shuffled dicts"
+    for i in range(NTIMES):
+        local_dict_frac_thresh_otus = create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, otu_table_biom)
+
         if counter % 100 == 0:
             print counter
         counter += 1
@@ -435,6 +455,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
                 glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres].append(r_OTUs)
             else:
                 glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
+
 
     
     '''
@@ -447,34 +468,6 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         
 
 
-    '''
-    ## using mapreduce to parallelize the core microbiome on random dicts
-    #shuffled_core_mic = ShuffleDictPipeline()#ndb_custom_key, otu_table_biom) 
-    shuffled_core_mic = ShuffleDictPipeline(ndb_custom_key, otu_table_biom) 
-    shuffled_core_mic.start()
-
-
-    # this keeps the below code from running until mapreduce is finished    
-    #time.sleep(55)
-    
-    
-    # Later on, see if it's done.
-    my_pipeline = shuffled_core_mic.pipeline_id
-    shuffled_core_mic = ShuffleDictPipeline.from_id(my_pipeline)
-    status_var = shuffled_core_mic.has_finalized
-    #print status_var
-    while not status_var:
-        shuffled_core_mic = ShuffleDictPipeline.from_id(my_pipeline)
-        status_var = shuffled_core_mic.has_finalized
-        print status_var
-        if status_var:
-            print "........Breaking........"
-            break
-        print "........Waiting.........sleep 30 secs"
-        time.sleep(30)
-
-    print "........Done Waiting........."
-    '''
      
     '''
     the following section compiles results from the Result Datatstore and calculates stats.
@@ -493,7 +486,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         # this number should be equal to the number of randomizations
         # qry_entries_in_result_rand_dict is a list of list, the internal list is tab-delimited OTU# and OTU name
         qry_entries_in_result_rand_dict = glob_qry_entries_in_result_rand_dict[ndb_custom_key_qury_id]
-        print 'Number of results from randomized dict = ' , len(qry_entries_in_result_rand_dict)
+        print 'Number of results from randomized dict for ' , frac_s , '% threshold = ' , len(qry_entries_in_result_rand_dict)
         #print qry_entries_in_result_rand_dict
 
         # compile the results from randomization
