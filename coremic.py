@@ -345,6 +345,11 @@ def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group, mapping
         indx_categ = labels.index(c)
     except ValueError:
         errors_list.append("'%s' not in the headers of the sample <-> group info file" %c)
+    
+    
+    if int(NTIMES) % 50 != 0:
+        errors_list.append("Number of randomizations requested is not multiple of 50. Kindly rerun job")
+
 
     return (indx_sampleid , indx_categ , errors_list)
 
@@ -698,7 +703,7 @@ MAIN_PAGE_HTML = """\
 		<input type="text" name="group" value="Person:Good" size="30">
 	</p>
 	<p>
-		Enter number of randomizations to be performed (500 to 10,000):<br>
+		Enter number of randomizations to be performed (USE multiples of 50; 500 to 1,500):<br>
 		<input type="text" name="random" value="1000" size="30">
 	</p>
 	<p>
@@ -788,7 +793,7 @@ class Guestbook(webapp2.RequestHandler):
 
         Result_TrueDict(id='fatherresultstrue').put() # the datastore of results from random dicts
 
-        numb_tasks = int(NTIMES)/10
+        numb_tasks = int(NTIMES)/50
         # try to break the randomizations into n tasks of 100 randomizations each and then run them one by one
         # finally run the significance calculation
         # might have to first move the sign calc to a separate method
@@ -812,50 +817,30 @@ class ProcessData(webapp2.RequestHandler):
         '''
     def get(self, photo_key):
         '''
-        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
         
-        if int(qry_entries_in_origbiom.count()) == 1:
-            print "Read single entry from OriginalBiom datastore!"
-        else:
-            # do something useful here
-            print "Single entry not found from OriginalBiom datastore, some error!"
-        
-        for q in qry_entries_in_origbiom:
-            print "Running 1st attempt"
-            q_dict = q.to_dict()
-           
-            params = q_dict['params_str']  # this is a dictionary
-            factor = params["factor"]
-            group = params["group"]
-            p_val_adj = params["p_val_adj"]
-            DELIM = params["delim"]
-            NTIMES = str(10)  #(params["ntimes"])
-            OUTPFILE = params["outpfile"]
-            to_email = params["to_email"]
+        ## get rid of this orig biom and use only the method
+        ## also move the true results to a separate task to avoid redoing work
+        user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, g_info_list, factor, group, OUTPFILE = get_required_params_from_orig_dict(otu_table_biom_o)
             
-            otu_table_biom = q_dict['biom']        
-             
-            g_info_list = params["g_info_not_list"].split('\n')
-            
+        indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+        if len(errors_list) > 0: # temp hack since blobstore randomly swaps file order during upload
+            tmp = g_info_list
+            g_info_list = otu_table_biom
+            otu_table_biom = tmp
+            # retry with swapped files
             indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
-            if len(errors_list) > 0: # temp hack since blobstore randomly swaps file order during upload
-                tmp = g_info_list
-                g_info_list = otu_table_biom
-                otu_table_biom = tmp
-                # retry with swapped files
-                indx_sampleid , indx_categ , errors_list = validate_inputs("ndb_custom_key", "user_args", otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
-                if len(errors_list) > 0: # just give up on this
-                    print '\n'.join(errors_list)
-                    # put code here so that the code doesn't run further
-                    sys.exit(0)
-                else:
-                    print 'Swapping files worked!'
+            if len(errors_list) > 0: # just give up on this
+                print '\n'.join(errors_list)
+                # put code here so that the code doesn't run further
+                sys.exit(0)
             else:
-                print 'No file swapping needed!'
+                print 'Swapping files worked!'
+        else:
+            print 'No file swapping needed!'
 
-            #print 'OTU' , otu_table_biom, '\n', 'GINFO', g_info_list
+        #print 'OTU' , otu_table_biom, '\n', 'GINFO', g_info_list
 
-            calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+        calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
 
 
 def get_required_params_from_orig_dict(otu_table_biom_o):
@@ -876,7 +861,7 @@ def get_required_params_from_orig_dict(otu_table_biom_o):
             group = params["group"]
             p_val_adj = params["p_val_adj"]
             DELIM = params["delim"]
-            NTIMES = str(params["ntimes"])
+            NTIMES = str(50) #params["ntimes"])
             OUTPFILE = params["outpfile"]
             to_email = params["to_email"]
             
@@ -884,9 +869,9 @@ def get_required_params_from_orig_dict(otu_table_biom_o):
              
             g_info_list = params["g_info_not_list"].split('\n')
             
-            user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s\n# of randomizations: %s\n\n\n'  %(factor, group, p_val_adj, NTIMES)
+            user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s'  %(factor, group, p_val_adj)
 
-            return user_args, to_email, p_val_adj, DELIM, NTIMES
+            return user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, g_info_list, factor, group, OUTPFILE
 
 
 class ProcessResults(webapp2.RequestHandler):
@@ -902,11 +887,12 @@ class ProcessResults(webapp2.RequestHandler):
             break
 
         qry_entries_in_result_randomdict = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, 'fatherresults'))
-        print qry_entries_in_result_Truedict.count(), qry_entries_in_result_randomdict.count()
+        qry_entries_in_result_randomdict_count = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, 'fatherresults')).count(limit=100000)
+        print "Counts" , qry_entries_in_result_randomdict_count, qry_entries_in_result_Truedict.count(), qry_entries_in_result_randomdict.count()
         
         #print true_result_frac_thresh_otus_dict
         
-        if int(qry_entries_in_result_randomdict.count()) == (int(numb_tasks)*10):
+        if int(qry_entries_in_result_randomdict_count) == (int(numb_tasks)*50):
             print "Previous work completed, can move for final stage!"
             # merge all the available dictionaries into one
             glob_qry_entries_in_result_rand_dict =  dict()
@@ -919,13 +905,21 @@ class ProcessResults(webapp2.RequestHandler):
                         glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres].append(r_OTUs)
                     else:
                         glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
-            user_args, to_email, p_val_adj, DELIM, NTIMES = get_required_params_from_orig_dict(otu_table_biom_o)
+            tmp_user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, g_info_list, factor, group, OUTPFILE = get_required_params_from_orig_dict(otu_table_biom_o)
+            NTIMES = int(numb_tasks)*50
+            user_args = tmp_user_args + "\n# of randomizations: " + str(NTIMES) + "\n\n\n"
             compile_all_results_perform_sign_calc(otu_table_biom_o, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
+            # may want to purge remaining tasks, be careful since you do not want to delete someone
+            # else's tasks
+            # Purge entire queue...
+            purgeq = taskqueue.Queue('default')
+            purgeq.purge()
 
 
         else:
             # do something useful here
             print "Waiting for previous tasks to finish!"
+            #time.sleep(55) # allow some time for the other process to finish
             taskqueue.add(url="/process_results", params={'otu_table_biom_key': otu_table_biom_o, 'numb_tasks' : numb_tasks},
                  retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
                 countdown=1)
