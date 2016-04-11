@@ -156,10 +156,17 @@ class RandomDict(ndb.Model):
 # the actual key is automatically generated
 class Result_RandomDict(ndb.Model):
   idx = ndb.StringProperty() # the run id
-  frac_thresh = ndb.StringProperty() # the frac threshold along with the run id
-  entry_id = ndb.StringProperty() # the frac threshold and entry along with the run id
+  #frac_thresh = ndb.StringProperty() # the frac threshold along with the run id
+  #entry_id = ndb.StringProperty() # the frac threshold and entry along with the run id
   otus = ndb.JsonProperty() # the core otus from the (shuffled) dictionary as a json
-  biom = ndb.JsonProperty() # the core biom from the (shuffled) dictionary as a json
+  #true_results = ndb.JsonProperty() # the core biom from the true dictionary as a json
+
+class Result_TrueDict(ndb.Model):
+  idx = ndb.StringProperty() # the run id
+  #frac_thresh = ndb.StringProperty() # the frac threshold along with the run id
+  #entry_id = ndb.StringProperty() # the frac threshold and entry along with the run id
+  #otus = ndb.JsonProperty() # the core otus from the (shuffled) dictionary as a json
+  true_results = ndb.JsonProperty() # the core biom from the true dictionary as a json
 
 
 # the actual key is automatically generated
@@ -277,6 +284,7 @@ def shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom):
     return local_dict_frac_thresh_otus ## change this to something useful
 
 
+
 def shuffle_dicts(a): ## takes dictionary
     keys = a.keys() #If items(), keys(), values() are called with no intervening modifications to the dictionary, the lists will directly correspond.
     values, lengths = get_values_from_dict(a)
@@ -375,7 +383,8 @@ def create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, ot
 
         shuffled_dict = shuffle_dicts(categ_samples_dict)
         ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
-        local_dict_frac_thresh_otus = shuffle_dict_coremic_serial_dict_no_datastore(shuffled_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom)
+        #local_dict_frac_thresh_otus = shuffle_dict_coremic_serial_dict_no_datastore(shuffled_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom)
+        local_dict_frac_thresh_otus = shuffle_dict_coremic_serial_dict_datastore(shuffled_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom)
         
         #RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
         return local_dict_frac_thresh_otus
@@ -408,6 +417,38 @@ def shuffle_dict_coremic_serial_dict_no_datastore(rand_mapping_info_dict, ndb_cu
 
         return local_dict_frac_thresh_otus ## change this to something useful
 
+def shuffle_dict_coremic_serial_dict_datastore(rand_mapping_info_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom):
+        '''
+        get the randomized dict and run core microbiome
+        '''    
+
+        local_dict_frac_thresh_otus = dict()
+
+        OUTPFILE, c, group, rand_iter_numb = ndb_custom_key_entry.split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
+        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
+        rand_o_dir = rand_iter_numb + OUTPFILE
+        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
+
+        '''
+         arrange the results to look pretty
+        '''
+        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
+            r_OTUs , r_biom = r_core_OTUs_biom
+            
+            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
+            
+            if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
+                print "Why do you have same fraction thresholds repeating?"
+                #local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres].append(r_OTUs)
+            else:
+                local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = r_OTUs
+
+        Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
+                     idx= ndb_custom_key, otus = local_dict_frac_thresh_otus).put()
+
+
+        return local_dict_frac_thresh_otus ## change this to something useful
+
 
 def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
 
@@ -429,15 +470,10 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     
     out_str = ''
     true_result_frac_thresh_otus_dict = run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM)
+    Result_TrueDict(parent=ndb.Key(Result_TrueDict, 'fatherresultstrue'), \
+                     idx= ndb_custom_key, true_results = true_result_frac_thresh_otus_dict).put()
     print "Processed %s fraction thresholds for true data" % str(len(true_result_frac_thresh_otus_dict))
     
-    ''' 
-    temporary hack to clear out the Datastore     http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
-    '''
-    ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
-    ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
-    ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
-    ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
 
     glob_qry_entries_in_result_rand_dict =  dict()
     counter = 1
@@ -456,7 +492,11 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
             else:
                 glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
 
-
+    '''
+    Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
+                     idx= ndb_custom_key, otus = glob_qry_entries_in_result_rand_dict,
+                     true_results = true_result_frac_thresh_otus_dict).put()
+    '''
     
     '''
     other options to try out (if we are limited by 10 mins deadline):
@@ -465,7 +505,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
      - try mapreduce
      - try basic or manual scaling https://cloud.google.com/appengine/docs/python/modules/
     '''
-    compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
+    #compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
 
 def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES):
      
@@ -476,6 +516,8 @@ def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_re
     print "Compiling results"
     sign_results = 'Significant results:\nOTU\tFreq. in randomized data\tpval=freq/times randomized\t%s corrected pval\n' %p_val_adj
     p_val = 0.05 
+
+    #print true_result_frac_thresh_otus_dict
 
     # compile results; print the number of random occurances for each true core microbiome otu (checks significance)
     for frac_s in [75, 80, 85, 90, 95, 100]:#for frac_s in [100]:
@@ -727,18 +769,38 @@ class Guestbook(webapp2.RequestHandler):
                      "ntimes" : str(NTIMES), 
                      "outpfile" : OUTPFILE, 
                      "to_email" : to_email }
-            
+        
+        ''' 
+        temporary hack to clear out the Datastore     http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
+        '''
+        ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
+        ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
+        ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
+        ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
+        ndb.delete_multi(Result_TrueDict.query().fetch(keys_only=True)) 
+
 
         OriginalBiom(id='origbiom').put()  # the datastore of original biom
         OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), 
             idx= ndb_custom_key_o, biom = otu_table_biom, params_str=local_string_hack_dict).put()
 
+        Result_RandomDict(id='fatherresults').put() # the datastore of results from random dicts
+
+        Result_TrueDict(id='fatherresultstrue').put() # the datastore of results from random dicts
+
+        numb_tasks = int(NTIMES)/10
         # try to break the randomizations into n tasks of 100 randomizations each and then run them one by one
         # finally run the significance calculation
         # might have to first move the sign calc to a separate method
-        # http://stackoverflow.com/questions/4224564/calling-a-script-after-tasks-queue-is-empty  
-        taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o},
+        # add the result dicts to datastore and pull them for compiling
+        # http://stackoverflow.com/questions/4224564/calling-a-script-after-tasks-queue-is-empty 
+        for i in range(numb_tasks):
+            taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o},
                  retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
+                countdown=1)
+
+        taskqueue.add(url="/process_results", params={'otu_table_biom_key': ndb_custom_key_o, 'numb_tasks' : numb_tasks},
+                retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
                 countdown=1)
         
         self.redirect('/')
@@ -767,7 +829,7 @@ class ProcessData(webapp2.RequestHandler):
             group = params["group"]
             p_val_adj = params["p_val_adj"]
             DELIM = params["delim"]
-            NTIMES = str(params["ntimes"])
+            NTIMES = str(10)  #(params["ntimes"])
             OUTPFILE = params["outpfile"]
             to_email = params["to_email"]
             
@@ -796,7 +858,79 @@ class ProcessData(webapp2.RequestHandler):
             calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
 
 
+def get_required_params_from_orig_dict(otu_table_biom_o):
+        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
         
+        if int(qry_entries_in_origbiom.count()) == 1:
+            print "Read single entry from OriginalBiom datastore!"
+        else:
+            # do something useful here
+            print "Single entry not found from OriginalBiom datastore, some error!"
+        
+        for q in qry_entries_in_origbiom:
+            print "Running 1st attempt"
+            q_dict = q.to_dict()
+           
+            params = q_dict['params_str']  # this is a dictionary
+            factor = params["factor"]
+            group = params["group"]
+            p_val_adj = params["p_val_adj"]
+            DELIM = params["delim"]
+            NTIMES = str(params["ntimes"])
+            OUTPFILE = params["outpfile"]
+            to_email = params["to_email"]
+            
+            otu_table_biom = q_dict['biom']        
+             
+            g_info_list = params["g_info_not_list"].split('\n')
+            
+            user_args = 'You selected the following parameters:\nFactor: %s\nGroup: %s\nPval correction: %s\n# of randomizations: %s\n\n\n'  %(factor, group, p_val_adj, NTIMES)
+
+            return user_args, to_email, p_val_adj, DELIM, NTIMES
+
+
+class ProcessResults(webapp2.RequestHandler):
+    def post(self):
+        otu_table_biom_o = self.request.get("otu_table_biom_key")
+        numb_tasks = self.request.get("numb_tasks")
+
+        true_result_frac_thresh_otus_dict = dict()
+        qry_entries_in_result_Truedict = Result_TrueDict.query(Result_TrueDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_TrueDict, 'fatherresultstrue'))
+        for t in qry_entries_in_result_Truedict:
+            t_dict = t.to_dict()
+            true_result_frac_thresh_otus_dict = t_dict['true_results']
+            break
+
+        qry_entries_in_result_randomdict = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, 'fatherresults'))
+        print qry_entries_in_result_Truedict.count(), qry_entries_in_result_randomdict.count()
+        
+        #print true_result_frac_thresh_otus_dict
+        
+        if int(qry_entries_in_result_randomdict.count()) == (int(numb_tasks)*10):
+            print "Previous work completed, can move for final stage!"
+            # merge all the available dictionaries into one
+            glob_qry_entries_in_result_rand_dict =  dict()
+
+            for q in qry_entries_in_result_randomdict:
+                q_dict = q.to_dict()
+                local_dict_frac_thresh_otus = q_dict['otus']
+                for ndb_custom_key_r_frac_thres , r_OTUs in local_dict_frac_thresh_otus.items():
+                    if ndb_custom_key_r_frac_thres in glob_qry_entries_in_result_rand_dict:
+                        glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres].append(r_OTUs)
+                    else:
+                        glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
+            user_args, to_email, p_val_adj, DELIM, NTIMES = get_required_params_from_orig_dict(otu_table_biom_o)
+            compile_all_results_perform_sign_calc(otu_table_biom_o, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
+
+
+        else:
+            # do something useful here
+            print "Waiting for previous tasks to finish!"
+            taskqueue.add(url="/process_results", params={'otu_table_biom_key': otu_table_biom_o, 'numb_tasks' : numb_tasks},
+                 retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
+                countdown=1)
+
+      
 
 
 
@@ -804,6 +938,7 @@ app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/sign', Guestbook),
     ('/process_data', ProcessData),
+    ('/process_results', ProcessResults),
 ], debug=True)
 
 
