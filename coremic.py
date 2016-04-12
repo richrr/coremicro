@@ -355,7 +355,7 @@ def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group, mapping
 
 
 # run core microbiome on original data
-def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM):
+def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM, ndb_custom_key):
     o_dir = 'true_result' + OUTPFILE
     result = exec_core_microb_cmd(otu_table_biom, o_dir, mapping_info_list, c, group) 
     # result dict has following keys 'fractions_for_core' , 'otu_counts' , 'frac_thresh_core_OTUs_biom'
@@ -364,6 +364,11 @@ def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM):
     for frac_thresh , core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
         OTUs , biom = core_OTUs_biom # this is a tuple of otus and biom
         true_result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs, DELIM)
+
+    Result_TrueDict(parent=ndb.Key(Result_TrueDict, 'fatherresultstrue'), \
+                     idx= ndb_custom_key, true_results = true_result_frac_thresh_otus_dict).put()
+    print "Processed %s fraction thresholds for true data" % str(len(true_result_frac_thresh_otus_dict))
+
     return true_result_frac_thresh_otus_dict
 
 
@@ -473,12 +478,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
         # put code here so that the code doesn't run further
 
     
-    out_str = ''
-    true_result_frac_thresh_otus_dict = run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM)
-    Result_TrueDict(parent=ndb.Key(Result_TrueDict, 'fatherresultstrue'), \
-                     idx= ndb_custom_key, true_results = true_result_frac_thresh_otus_dict).put()
-    print "Processed %s fraction thresholds for true data" % str(len(true_result_frac_thresh_otus_dict))
-    
+    out_str = ''    
 
     glob_qry_entries_in_result_rand_dict =  dict()
     counter = 1
@@ -526,7 +526,7 @@ def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_re
 
     # compile results; print the number of random occurances for each true core microbiome otu (checks significance)
     for frac_s in [75, 80, 85, 90, 95, 100]:#for frac_s in [100]:
-        sign_results += '#Frac thresh %s\n' % str(frac_s)
+        sign_results += '\n#Frac thresh %s\n' % str(frac_s)
         
         ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
         
@@ -799,8 +799,11 @@ class Guestbook(webapp2.RequestHandler):
         # might have to first move the sign calc to a separate method
         # add the result dicts to datastore and pull them for compiling
         # http://stackoverflow.com/questions/4224564/calling-a-script-after-tasks-queue-is-empty 
+        taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o , 'true_random' : 'true'},
+                 retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
+                countdown=1)
         for i in range(numb_tasks):
-            taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o},
+            taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o , 'true_random' : 'random'},
                  retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
                 countdown=1)
 
@@ -814,6 +817,7 @@ class Guestbook(webapp2.RequestHandler):
 class ProcessData(webapp2.RequestHandler):
     def post(self):
         otu_table_biom_o = self.request.get("otu_table_biom_key")
+        true_random = self.request.get("true_random")
         '''
     def get(self, photo_key):
         '''
@@ -839,8 +843,12 @@ class ProcessData(webapp2.RequestHandler):
             print 'No file swapping needed!'
 
         #print 'OTU' , otu_table_biom, '\n', 'GINFO', g_info_list
+        ndb_custom_key = OUTPFILE + '~~~~' + factor + '~~~~' + group  # this is to query all entries in this run
 
-        calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+        if true_random == "true":
+            run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor, group, DELIM, ndb_custom_key)
+        elif true_random == "random":
+            calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, factor, group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
 
 
 def get_required_params_from_orig_dict(otu_table_biom_o):
@@ -881,6 +889,13 @@ class ProcessResults(webapp2.RequestHandler):
 
         true_result_frac_thresh_otus_dict = dict()
         qry_entries_in_result_Truedict = Result_TrueDict.query(Result_TrueDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_TrueDict, 'fatherresultstrue'))
+        
+        if int(qry_entries_in_result_Truedict.count()) == 1:
+            print "Read single entry from Truedict datastore!"
+        else:
+            # do something useful here
+            print "Single entry not found from Truedict datastore, some error!"
+        
         for t in qry_entries_in_result_Truedict:
             t_dict = t.to_dict()
             true_result_frac_thresh_otus_dict = t_dict['true_results']
@@ -907,6 +922,7 @@ class ProcessResults(webapp2.RequestHandler):
                         glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
             tmp_user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, g_info_list, factor, group, OUTPFILE = get_required_params_from_orig_dict(otu_table_biom_o)
             NTIMES = int(numb_tasks)*50
+            
             user_args = tmp_user_args + "\n# of randomizations: " + str(NTIMES) + "\n\n\n"
             compile_all_results_perform_sign_calc(otu_table_biom_o, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
             # may want to purge remaining tasks, be careful since you do not want to delete someone
