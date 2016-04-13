@@ -97,60 +97,6 @@ from google.appengine.ext.blobstore import BlobKey
 #http://stackoverflow.com/questions/11849456/how-to-filter-datastore-data-before-mapping-to-cloud-storage-using-the-mapreduce
 #http://stackoverflow.com/questions/23508116/appengine-mapreduce-how-to-filter-structuredproperty-while-using-datastore-input
 
-# This datastore model keeps track of which users uploaded which photos.
-class UserPhoto(ndb.Model):
-    request_id = ndb.StringProperty()
-    otu_table_biom_blob_key = ndb.BlobKeyProperty()
-    group_info_blob_key = ndb.BlobKeyProperty()
-    params_str = ndb.JsonProperty()
-
-
-#"filters": [("idx", "=", ndb_custom_key)]
-class ShuffleDictPipeline(base_handler.PipelineBase):
-  def run(self, ndb_custom_key, otu_table_biom):
-    output = yield mapreduce_pipeline.MapperPipeline(
-      "calc_shuff_core_microb",
-      "coremic.shuffle_dict_coremic_map",
-      "mapreduce.input_readers.DatastoreInputReader", 
-      output_writer_spec="mapreduce.output_writers.GoogleCloudStorageConsistentOutputWriter",
-      params={
-        "input_reader":{
-          "entity_kind":  "coremic.RandomDict",
-          "ndb_custom_key" : ndb_custom_key,
-          "otu_table_biom" : otu_table_biom
-        },
-        "output_writer":{
-          "filesystem": "gs",
-          "bucket_name": "coremicrobucket"
-        }
-      },
-      shards=250) #200
-    #print output
-    #with pipeline.After(output):
-    yield CloudStorageWriter(output)
-
-
-class ResultFile(ndb.Model):
-  file_name = ndb.StringProperty()
-  date = ndb.DateTimeProperty(auto_now_add=True)
-
-
-## this is useless information for now, fix it or delete it
-class CloudStorageWriter(base_handler.PipelineBase):
-    def run(self, csv_output):
-      # Store all the file names
-      files = [str(f.replace('/gs/', 'gs://')) for f in csv_output]
-      for f in files:
-        entry = ResultFile(file_name=f)
-        entry.put()
-
-
-# the actual key is automatically generated
-class RandomDict(ndb.Model):
-  idx = ndb.StringProperty() # the run id
-  entry_id = ndb.StringProperty() # the entry along with the run id
-  dict = ndb.JsonProperty() # the (shuffled) dictionary as a json
-
 
 ## for every random dict entry, it has different thresholds
 # the actual key is automatically generated
@@ -160,6 +106,7 @@ class Result_RandomDict(ndb.Model):
   #entry_id = ndb.StringProperty() # the frac threshold and entry along with the run id
   otus = ndb.JsonProperty() # the core otus from the (shuffled) dictionary as a json
   #true_results = ndb.JsonProperty() # the core biom from the true dictionary as a json
+
 
 class Result_TrueDict(ndb.Model):
   idx = ndb.StringProperty() # the run id
@@ -181,77 +128,7 @@ def divide_list(a, lengths):
     return a[:lengths[0]] , a[lengths[0]:]  # a[start:end] # items start through end-1
 
 
-def shuffle_dict_coremic_map(entity):
-    '''
-     get the params and any information that was passed
-    '''
-    ctx = context.get()
-    params = ctx.mapreduce_spec.mapper.params
-    #print params #{u'input_reader': {u'ndb_custom_key': u'Zen-outputTue-05-Apr-2016-11:31:08-PM43MDJ2~~~~Plant~~~~Sw', u'entity_kind': u'coremic.RandomDict', u'otu_table_biom' : u'too big dict...to show here'}, u'output_writer': {u'filesystem': u'gs', u'bucket_name': u'coremicrobucket'}}
-    ndb_custom_key = params['input_reader']["ndb_custom_key"]
-    otu_table_biom = params['input_reader']["otu_table_biom"]
-    #print otu_table_biom
 
-    '''
-     get the randomized dict and run core microbiome
-    '''    
-    entty = entity.to_dict()
-    #print ndb_custom_key , 'aaaaaaaaaaaaaaa'
-    #print entty['idx'] , 'AAAAAAAAAAAAAAAA'
-    r_out_str = ''
-    if entty['idx'] == ndb_custom_key:
-        rand_mapping_info_dict = entty['dict']
-        OUTPFILE, c, group, rand_iter_numb = entty['entry_id'].split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
-        rand_o_dir = rand_iter_numb + OUTPFILE
-        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
-
-        '''
-         arrange the results to look pretty
-        '''
-        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
-            r_OTUs , r_biom = r_core_OTUs_biom
-            #r_out_str += "Frac Threshold %s:\n%s\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs), r_biom)
-            #r_out_str += "Frac Threshold %s:\n%s\n\n" % (r_frac_thresh, ''.join(r_OTUs))
-            
-            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
-            ndb_custom_key_r_frac_thres_entry = ndb_custom_key_r_frac_thres + '~~~~' + rand_iter_numb
-
-            Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
-                     idx= ndb_custom_key, frac_thresh = ndb_custom_key_r_frac_thres, \
-                     entry_id = ndb_custom_key_r_frac_thres_entry, \
-                     otus = r_OTUs, biom = r_biom).put()
-
-    yield '1' ## change this to something useful
-
-
-def shuffle_dict_coremic_serial(entty, ndb_custom_key, otu_table_biom):
-    '''
-     get the randomized dict and run core microbiome
-    '''    
-    r_out_str = ''
-    if entty['idx'] == ndb_custom_key:
-        rand_mapping_info_dict = entty['dict']
-        OUTPFILE, c, group, rand_iter_numb = entty['entry_id'].split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
-        rand_o_dir = rand_iter_numb + OUTPFILE
-        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
-
-        '''
-         arrange the results to look pretty
-        '''
-        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
-            r_OTUs , r_biom = r_core_OTUs_biom
-            
-            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
-            ndb_custom_key_r_frac_thres_entry = ndb_custom_key_r_frac_thres + '~~~~' + rand_iter_numb
-
-            Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
-                     idx= ndb_custom_key, frac_thresh = ndb_custom_key_r_frac_thres, \
-                     entry_id = ndb_custom_key_r_frac_thres_entry, \
-                     otus = r_OTUs, biom = r_biom).put()
-
-    return '1' ## change this to something useful
 
 
 def shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom):
@@ -329,7 +206,6 @@ def calc_freq_elem_list(a):
     return counter
 
 
-
 def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group, mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
     # find index of SampleID and category to be summarized  # e.g. swg or non-swg
     labels = mapping_info_list[0].split(DELIM)
@@ -373,20 +249,6 @@ def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM, 
     return true_result_frac_thresh_otus_dict
 
 
-def create_shuffled_dicts(NTIMES, categ_samples_dict, ndb_custom_key):
-    '''
-    The following section creates shuffled dictionaries and puts them in datastore
-    '''
-    # do this to get consistency in queries, else the number of returned results vary
-    #http://stackoverflow.com/questions/14630886/ndb-and-consistency-why-is-happening-this-behavior-in-a-query-without-a-parent
-    RandomDict(id='father').put()  # the datastore of random dicts
-
-    for i in range(NTIMES):
-        shuffled_dict = shuffle_dicts(categ_samples_dict)
-        ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
-        RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
-    return 1
-
 def create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, otu_table_biom):
         '''
         The following section creates shuffled dictionaries and puts them in datastore
@@ -400,33 +262,6 @@ def create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, ot
         #RandomDict(parent=ndb.Key(RandomDict, 'father'), idx= ndb_custom_key, entry_id = ndb_custom_key_entry, dict= shuffled_dict).put()
         return local_dict_frac_thresh_otus
 
-def shuffle_dict_coremic_serial_dict_no_datastore(rand_mapping_info_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom):
-        '''
-        get the randomized dict and run core microbiome
-        '''    
-
-        local_dict_frac_thresh_otus = dict()
-
-        OUTPFILE, c, group, rand_iter_numb = ndb_custom_key_entry.split('~~~~') #Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-        rand_mapping_info_list = convert_shuffled_dict_to_str(rand_mapping_info_dict, c)
-        rand_o_dir = rand_iter_numb + OUTPFILE
-        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir, rand_mapping_info_list, c, group)
-
-        '''
-         arrange the results to look pretty
-        '''
-        for r_frac_thresh , r_core_OTUs_biom in sorted(result['frac_thresh_core_OTUs_biom'].items(), key=lambda (key, value): int(key)): # return the items in sorted order
-            r_OTUs , r_biom = r_core_OTUs_biom
-            
-            ndb_custom_key_r_frac_thres = ndb_custom_key + '~~~~' + r_frac_thresh
-            
-            if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
-                print "Why do you have same fraction thresholds repeating?"
-                #local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres].append(r_OTUs)
-            else:
-                local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = r_OTUs
-
-        return local_dict_frac_thresh_otus ## change this to something useful
 
 def shuffle_dict_coremic_serial_dict_datastore(rand_mapping_info_dict, ndb_custom_key, ndb_custom_key_entry, otu_table_biom):
         '''
@@ -486,33 +321,8 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
 
     print "Creating shuffled dicts"
     for i in range(NTIMES):
-        local_dict_frac_thresh_otus = create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, otu_table_biom)
-        '''
-        if counter % 100 == 0:
-            print counter
-        counter += 1
-        
-        for ndb_custom_key_r_frac_thres , r_OTUs in local_dict_frac_thresh_otus.items():
-            if ndb_custom_key_r_frac_thres in glob_qry_entries_in_result_rand_dict:
-                glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres].append(r_OTUs)
-            else:
-                glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
-        '''
+        create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, otu_table_biom)
 
-    '''
-    Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
-                     idx= ndb_custom_key, otus = glob_qry_entries_in_result_rand_dict,
-                     true_results = true_result_frac_thresh_otus_dict).put()
-    '''
-    
-    '''
-    other options to try out (if we are limited by 10 mins deadline):
-     - get rid of the datastore entries (this is definitely moving away from mapreduce which was more datastore dependent code)
-     - start taskqueue from time to time to start compiling the results while dicts are being processed
-     - try mapreduce
-     - try basic or manual scaling https://cloud.google.com/appengine/docs/python/modules/
-    '''
-    #compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES)  
 
 def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict, user_args, to_email, p_val_adj, DELIM, true_result_frac_thresh_otus_dict, NTIMES):
      
@@ -554,7 +364,7 @@ def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_re
         signif_core_microb_otu_dict = collections.OrderedDict()
         for o in true_result_frac_thresh_otus_dict[str(frac_s)]:
             #print o
-            freq = 1
+            freq = 0.1
             if o in randomized_otus: # the else for this means it was not observed even once in the randomized data!
                 freq = int(randomized_otus[o])
             otus_pval = freq/float(NTIMES)
@@ -711,8 +521,8 @@ MAIN_PAGE_HTML = """\
 		<input type="text" name="random" value="1000" size="30">
 	</p>
 	<p>
-	  <input type="radio" name="pvaladjmethod" value="bf" checked> Bonferroni<br>
-	  <input type="radio" name="pvaladjmethod" value="bh"> Benjamini Hochberg<br>
+	  <input type="radio" name="pvaladjmethod" value="bf"> Bonferroni<br>
+	  <input type="radio" name="pvaladjmethod" value="bh" checked> Benjamini Hochberg<br>
 	  <input type="radio" name="pvaladjmethod" value="none"> None
 	</p>
 	<p>
@@ -782,9 +592,9 @@ class Guestbook(webapp2.RequestHandler):
         ''' 
         temporary hack to clear out the Datastore     http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
         '''
-        ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
+        #ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
         ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
-        ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
+        #ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
         ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
         ndb.delete_multi(Result_TrueDict.query().fetch(keys_only=True)) 
 
@@ -798,10 +608,8 @@ class Guestbook(webapp2.RequestHandler):
         Result_TrueDict(id='fatherresultstrue').put() # the datastore of results from random dicts
 
         numb_tasks = int(NTIMES)/50
-        # try to break the randomizations into n tasks of 100 randomizations each and then run them one by one
+        # try to break the randomizations into n tasks of 50 randomizations each and then run them one by one
         # finally run the significance calculation
-        # might have to first move the sign calc to a separate method
-        # add the result dicts to datastore and pull them for compiling
         # http://stackoverflow.com/questions/4224564/calling-a-script-after-tasks-queue-is-empty 
         taskqueue.add(url="/process_data", params={'otu_table_biom_key': ndb_custom_key_o , 'true_random' : 'true'},
                  retry_options=TaskRetryOptions(task_retry_limit=0, task_age_limit=1),
