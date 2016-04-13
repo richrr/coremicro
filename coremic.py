@@ -320,6 +320,7 @@ def compile_results(otus, DELIM): # get unique elements from last column (otus)
         if '#' in l or not l:
             continue
         taxon_list.append(contents[1])
+    #print len(taxon_list), len(list(set(taxon_list)))
     return list(set(taxon_list))
 
 
@@ -486,7 +487,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
     print "Creating shuffled dicts"
     for i in range(NTIMES):
         local_dict_frac_thresh_otus = create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key, otu_table_biom)
-
+        '''
         if counter % 100 == 0:
             print counter
         counter += 1
@@ -496,6 +497,7 @@ def calc_significance(indx_sampleid , indx_categ , errors_list, otu_table_biom, 
                 glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres].append(r_OTUs)
             else:
                 glob_qry_entries_in_result_rand_dict[ndb_custom_key_r_frac_thres] = [r_OTUs]
+        '''
 
     '''
     Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
@@ -522,10 +524,9 @@ def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_re
     sign_results = 'Significant results:\nOTU\tFreq. in randomized data\tpval=freq/times randomized\t%s corrected pval\n' %p_val_adj
     p_val = 0.05 
 
-    #print true_result_frac_thresh_otus_dict
 
     # compile results; print the number of random occurances for each true core microbiome otu (checks significance)
-    for frac_s in [75, 80, 85, 90, 95, 100]:#for frac_s in [100]:
+    for frac_s in [75, 80, 85, 90, 95, 100]:
         sign_results += '\n#Frac thresh %s\n' % str(frac_s)
         
         ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
@@ -552,13 +553,16 @@ def compile_all_results_perform_sign_calc(ndb_custom_key, glob_qry_entries_in_re
         # check significance
         signif_core_microb_otu_dict = collections.OrderedDict()
         for o in true_result_frac_thresh_otus_dict[str(frac_s)]:
-            if o in randomized_otus:
+            #print o
+            freq = 1
+            if o in randomized_otus: # the else for this means it was not observed even once in the randomized data!
                 freq = int(randomized_otus[o])
-                otus_pval = freq/float(NTIMES)
-                if otus_pval < p_val:
-                    #otu = '%s\t%s\t%s\n' % (o, freq, otus_pval)
-                    #sign_results += otu
-                    signif_core_microb_otu_dict[o] = otus_pval
+            otus_pval = freq/float(NTIMES)
+            if otus_pval < p_val:
+                otu = '%s\t%s\t%s\n' % (o, freq, otus_pval)
+                #print otu
+                #sign_results += otu
+                signif_core_microb_otu_dict[o] = otus_pval
 
         # check if there is at least one significant entry so far:
         if len(signif_core_microb_otu_dict) == 0:
