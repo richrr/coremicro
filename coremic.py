@@ -242,7 +242,9 @@ def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM, 
         OTUs , biom = core_OTUs_biom # this is a tuple of otus and biom
         true_result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs, DELIM)
 
-    Result_TrueDict(parent=ndb.Key(Result_TrueDict, 'fatherresultstrue'), \
+
+    fatherrestrue_idx = 'fatherresultstrue' + ndb_custom_key
+    Result_TrueDict(parent=ndb.Key(Result_TrueDict, fatherrestrue_idx), \
                      idx= ndb_custom_key, true_results = true_result_frac_thresh_otus_dict).put()
     print "Processed %s fraction thresholds for true data" % str(len(true_result_frac_thresh_otus_dict))
 
@@ -289,7 +291,8 @@ def shuffle_dict_coremic_serial_dict_datastore(rand_mapping_info_dict, ndb_custo
             else:
                 local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = r_OTUs
 
-        Result_RandomDict(parent=ndb.Key(Result_RandomDict, 'fatherresults'), \
+        fatherres_idx = 'fatherresults' + ndb_custom_key
+        Result_RandomDict(parent=ndb.Key(Result_RandomDict, fatherres_idx), \
                      idx= ndb_custom_key, otus = local_dict_frac_thresh_otus).put()
 
 
@@ -593,19 +596,23 @@ class Guestbook(webapp2.RequestHandler):
         temporary hack to clear out the Datastore     http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
         '''
         #ndb.delete_multi(RandomDict.query().fetch(keys_only=True)) 
-        ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
         #ndb.delete_multi(ResultFile.query().fetch(keys_only=True)) 
+        ''' # uncomment this to clear out datastore every time
+        ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True)) 
         ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True)) 
         ndb.delete_multi(Result_TrueDict.query().fetch(keys_only=True)) 
-
-
-        OriginalBiom(id='origbiom').put()  # the datastore of original biom
-        OriginalBiom(parent=ndb.Key(OriginalBiom, 'origbiom'), 
+        '''
+        
+        origb_idx = 'origbiom' + ndb_custom_key_o
+        OriginalBiom(id=origb_idx).put()  # the datastore of original biom
+        OriginalBiom(parent=ndb.Key(OriginalBiom, origb_idx), 
             idx= ndb_custom_key_o, biom = otu_table_biom, params_str=local_string_hack_dict).put()
 
-        Result_RandomDict(id='fatherresults').put() # the datastore of results from random dicts
+        fatherres_idx = 'fatherresults' + ndb_custom_key_o
+        Result_RandomDict(id=fatherres_idx).put() # the datastore of results from random dicts
 
-        Result_TrueDict(id='fatherresultstrue').put() # the datastore of results from random dicts
+        fatherrestrue_idx = 'fatherresultstrue' + ndb_custom_key_o
+        Result_TrueDict(id=fatherrestrue_idx).put() # the datastore of results from random dicts
 
         numb_tasks = int(NTIMES)/50
         # try to break the randomizations into n tasks of 50 randomizations each and then run them one by one
@@ -664,7 +671,8 @@ class ProcessData(webapp2.RequestHandler):
 
 
 def get_required_params_from_orig_dict(otu_table_biom_o):
-        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, 'origbiom'))
+        origb_idx = 'origbiom' + otu_table_biom_o
+        qry_entries_in_origbiom = OriginalBiom.query(OriginalBiom.idx == otu_table_biom_o, ancestor=ndb.Key(OriginalBiom, origb_idx)) 
         
         if int(qry_entries_in_origbiom.count()) == 1:
             print "Read single entry from OriginalBiom datastore!"
@@ -699,8 +707,9 @@ class ProcessResults(webapp2.RequestHandler):
         otu_table_biom_o = self.request.get("otu_table_biom_key")
         numb_tasks = self.request.get("numb_tasks")
 
+        fatherrestrue_idx = 'fatherresultstrue' + otu_table_biom_o
         true_result_frac_thresh_otus_dict = dict()
-        qry_entries_in_result_Truedict = Result_TrueDict.query(Result_TrueDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_TrueDict, 'fatherresultstrue'))
+        qry_entries_in_result_Truedict = Result_TrueDict.query(Result_TrueDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_TrueDict, fatherrestrue_idx))
         
         if int(qry_entries_in_result_Truedict.count()) == 1:
             print "Read single entry from Truedict datastore!"
@@ -713,8 +722,9 @@ class ProcessResults(webapp2.RequestHandler):
             true_result_frac_thresh_otus_dict = t_dict['true_results']
             break
 
-        qry_entries_in_result_randomdict = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, 'fatherresults'))
-        qry_entries_in_result_randomdict_count = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, 'fatherresults')).count(limit=100000)
+        fatherres_idx = 'fatherresults' + otu_table_biom_o
+        qry_entries_in_result_randomdict = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, fatherres_idx))
+        qry_entries_in_result_randomdict_count = Result_RandomDict.query(Result_RandomDict.idx == otu_table_biom_o, ancestor=ndb.Key(Result_RandomDict, fatherres_idx)).count(limit=100000)
         print "Counts" , qry_entries_in_result_randomdict_count, qry_entries_in_result_Truedict.count(), qry_entries_in_result_randomdict.count()
         
         #print true_result_frac_thresh_otus_dict
