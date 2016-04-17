@@ -750,8 +750,8 @@ class ProcessResults(webapp2.RequestHandler):
             # may want to purge remaining tasks, be careful since you do not want to delete someone
             # else's tasks
             # Purge entire queue...
-            purgeq = taskqueue.Queue('default')
-            purgeq.purge()
+            #purgeq = taskqueue.Queue('default')
+            #purgeq.purge()
 
 
         else:
