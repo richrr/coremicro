@@ -1,4 +1,9 @@
-body {
-  font-family: Verdana, Helvetica, sans-serif;
-  background-color: #DDDDDD;
+#content {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#footer {
+    margin-top: 30px;
 }

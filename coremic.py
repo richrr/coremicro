@@ -493,62 +493,9 @@ def convert_shuffled_dict_to_str(DICT, categ):
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-
-
-MAIN_PAGE_HTML = """\
-<html>
-  <body>
-    <form action="{0}" enctype="multipart/form-data" method="post">
-    <b> 'Calculate significance of core microbiome' </b>
-	<p>
-		Type some text to use for your output (if you like):<br>
-		<input type="text" name="content" value="Zen-output" size="30">
-	</p>
-	<p>
-		Please specify the BIOM file containing an OTU table:<br>
-		make sure the header "taxonomy" is present<br>
-		<input type="file" name="datafile" size="40">
-	</p>
-	<p>
-		Please specify the <b>tab-delimited</b> file containing sample <-> group info:<br>
-		e.g. the group of interest "Person" has to be binary ("Good" vs "Bad")<br>
-		<input type="file" name="groupfile" size="40">
-	</p>
-	<p>
-		Enter EXACT string of the interest group on which you want core microbiome analysis to be performed:<br>
-		e.g., To calculate core microbiome of "Good" under the "Person" group, enter "Person:Good"<br>
-		<input type="text" name="group" value="Person:Good" size="30">
-	</p>
-	<p>
-		Enter number of randomizations to be performed (USE multiples of 50; 500 to 1,500):<br>
-		<input type="text" name="random" value="1000" size="30">
-	</p>
-	<p>
-	  <input type="radio" name="pvaladjmethod" value="bf"> Bonferroni<br>
-	  <input type="radio" name="pvaladjmethod" value="bh" checked> Benjamini Hochberg<br>
-	  <input type="radio" name="pvaladjmethod" value="none"> None
-	</p>
-	<p>
-		Enter the email address where you want your results emailed:<br>
-		Your results are NOT stored, you will only get these results via email<br>
-		<input type="text" name="email" value="user@domain.com" size="50">
-	</p>
-	<div>
-		<input type="submit" value="Send">
-	</div>
-    </form>
-    
-    <div>
-		Developed by Rodrigues RR and Williams MA, Virginia Tech. <br>
-		Acknowledgements: QIIME and GAE. <br>
-		This tool is free to use for non-profit or research purposes. <br>
-    See here for help section. <br>
-	</div>
-
-  </body>
-</html>
-"""
-
+page = open('index.html', 'r')
+MAIN_PAGE_HTML = page.read()
+page.close()
 
 class MainPage(webapp2.RequestHandler):
     def get(self):

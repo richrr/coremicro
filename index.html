@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Required for bootstrap -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+    
+    <title>Core Microbiome</title>
+    <link rel="stylesheet" type="text/css" href="stylesheets/main.css">
+  </head>
+  <body>
+    <div id="content">
+      <h1>Calculate Significance of Core Microbiome</h1>
+      <form action="{0}" enctype="multipart/form-data" method="post">
+        <div class="form-group">
+	  <label for="name">Name for output/label</label><br>
+	  <input id="name" type="text" name="content" value="Zen-output" size="30" required>
+        </div>
+        <div class="form-group">
+          <label for="datafile">Datafile</label><br>
+	  <input type="file" id="datafile" name="datafile" size="40" required>
+          <p class="help-block">
+            The BIOM file containing an OTU table. Please make sure the header "taxonomy" is present.
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="groupfile">Group file</label><br>
+	  <input type="file" id="groupfile" name="groupfile" size="40" required>
+          <p class="help-block">
+            Please specify the <b>tab-delimited</b> file containing sample <-> group info.<br>
+              The group of interest "Person" has to be binary ("Good" vs "Bad").
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="group">Intrest group</label><br>
+	  <input type="text" id="group" name="group" placeholder="Person:Good" size="30" required>
+          <p class="help-block">
+            Enter EXACT string of the interest group on which you want core microbiome analysis to be performed.<br>
+            To calculate core microbiome of "Good" under the "Person" group, enter "Person:Good"
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="random">Number of randomizations</label><br>
+	  <input type="number" name="random" value="1000" size="30" step="50" max="1500" min="50" required>
+          <p class="help-block">
+            Must be a multiple of 50 no larger than 1500
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="fvaldjmethod"><i>p</i>-value method</label><br>
+	  <input type="radio" name="pvaladjmethod" value="bf"> Bonferroni<br>
+	  <input type="radio" name="pvaladjmethod" value="bh" checked> Benjamini Hochberg<br>
+	  <input type="radio" name="pvaladjmethod" value="none"> None
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label><br>
+	  <input type="email" id="email" name="email" placeholder="user@domain.com" size="50">
+          <p class="help-block">
+            The email address where you want your results emailed.<br>
+	    Your results are NOT stored; you will only get these results via email<br>
+          </p>
+        </div>
+        <div>
+	  <input type="submit" value="Send" class="btn btn-default">
+        </div>
+      </form>
+      
+      <div id="footer">
+        <small>
+          Developed by Rodrigues RR and Williams MA, Virginia Tech. <br>
+          Acknowledgements: QIIME and GAE. <br>
+          This tool is free to use for non-profit or research purposes. <br>
+          See here for help section. <br>
+        </small>
+      </div>
+    </div>
+
+    
+    <!-- Scripts for Bootstrap -->
+    
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/bootstrap.min.js"></script>
+  </body>
+</html>
