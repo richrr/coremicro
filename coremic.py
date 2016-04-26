@@ -422,7 +422,7 @@ def send_results_as_email(timestmp, user_args, msg, to_email):
     msg_str = """
 Dear User:
 
-Your data has been processed. Thanks for using this tool.
+Your data has been processed and is attached. Thanks for using this tool.
 
 Please email us if you have any questions.
 
@@ -431,10 +431,10 @@ The Core Microbiome Team
 """
     
     msg_str += user_args
-    
-    msg_str += msg
 
     message.body = msg_str
+
+    message.attachments = ['results.tsv', msg.encode('utf-8')]
 
     message.send()
 
