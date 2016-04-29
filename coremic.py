@@ -518,9 +518,9 @@ class Guestbook(webapp2.RequestHandler):
         # ndb.delete_multi(RandomDict.query().fetch(keys_only=True))
         # ndb.delete_multi(ResultFile.query().fetch(keys_only=True))
         # uncomment this to clear out datastore every time
-        # ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True))
-        # ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True))
-        # ndb.delete_multi(Result_TrueDict.query().fetch(keys_only=True))
+        ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True))
+        ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True))
+        ndb.delete_multi(Result_TrueDict.query().fetch(keys_only=True))
 
         origb_idx = 'origbiom' + ndb_custom_key_o
         OriginalBiom(id=origb_idx).put()  # the datastore of original biom
