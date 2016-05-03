@@ -10,17 +10,19 @@ in_otu_style['hz_line_color'] = 'Red'
 
 
 def layout(node):
-    if node.name:
+    '''
+    The layout function for exporting treees
+    '''
+    # Label the leaves
+    if node.is_leaf():
+        # Mark the core OTUs seprately
         if hasattr(node, IN_CORE_OTU_FEATURE_NAME):
             node.set_style(in_otu_style)
             faces.add_face_to_node(AttrFace('name', fgcolor='Red'), node,
                                    column=0)
         else:
             faces.add_face_to_node(AttrFace('name'), node, column=0)
-    if node.is_leaf() and node.name:
-        if hasattr(node, IN_CORE_OTU_FEATURE_NAME):
-            faces.add_face_to_node(AttrFace('name'), node, column=0,
-                                   position='aligned')
+
 
 # Style for exported trees
 ts = TreeStyle()
@@ -29,11 +31,11 @@ ts.show_scale = False
 ts.layout_fn = layout
 
 
-def load_tree(filename):
+def load_tree(filename, format=1):
     '''
     load and return a tree from the specified file
     '''
-    return Tree(filename, format=8)
+    return Tree(filename, format=format)
 
 
 def export_tree(tree, filename):
@@ -42,7 +44,7 @@ def export_tree(tree, filename):
     '''
     tree.render(filename, w=1080, tree_style=ts)
 
-    
+
 def mark_core(core_otus, tree):
     '''
     Mark the given list of core otus in the given tree
@@ -74,12 +76,12 @@ def get_otu_taxa(name):
 
     return a list of the taxa of the otu
     '''
-    return [c[3:] for c in name.split(';')]
+    return [c.strip()[3:] for c in name.split(';')]
 
 
-def make_sparse_tree(core_otus):
+def make_tree(core_otus):
     '''
-    Makes a sparse tree from the given OTUs
+    Makes a tree from the given OTUs
     '''
     tree = Tree()
     for otu in core_otus:
@@ -110,8 +112,32 @@ def find_immediate_child(node, name):
             return child
     return None
 
+
+def remove_long_root(tree):
+    '''
+    If the root has only one child, uses that child as the new root. This is
+    repeated until the root has multiple children
+    '''
+    while len(tree.children) == 1:
+        tree = tree.children[0]
+    return tree
+
+
+def generate_tree_from_list(filename):
+    '''
+    Generates a tree from a list of OTUs in a file with the format
+    <number>    k__[<Kingdom>][;p__[<Phylum>][;c__[<Class>][;o__[<Order>][;f__[<Family>][;g__[<Genus>][;s__[<Species>]]]]]]]
+    '''
+    file = open(filename, 'r')
+    data = file.read()
+    file.close()
+    names = [line.split('\t')[1] for line in data.split('\n') if line]
+    return make_tree(names)
+
+
 if __name__ == '__main__':
-    sparse = make_sparse_tree([
+    # tree = load_tree('big_tree.nw')
+    core = [
         'k__Bacteria;p__Planctomycetes;c__Planctomycetia;o__B97;f__;g__;s__',
         'k__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhizobiales;f__Rhizobiaceae',
         'k__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Alteromonadales;f__OM60;g__;s__',
@@ -127,12 +153,6 @@ if __name__ == '__main__':
         'k__Bacteria;p__WS3;c__PRR-12;o__Sediment-1;f__CV106;g__;s__',
         'k__Bacteria;p__Cyanobacteria;c__Chloroplast;o__Chlorophyta;f__;g__;s__',
         'k__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Sphingomonadales;f__Sphingomonadaceae;g__Sphingobium;s__',
-    ])
-    
-    export_tree(sparse, 'sparse.png')
-    marked = mark_core([
-        'k__Bacteria;p__Planctomycetes;c__Planctomycetia;o__B97;f__;g__;s__',
-        'k__Bacteria;p__Proteobacteria;c__Alphaproteobacteria;o__Rhizobiales;f__Rhizobiaceae',
-        'k__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Alteromonadales;f__OM60;g__;s__'
-    ], sparse)
-    export_tree(sparse, 'marked.png')
+    ]
+    tree = make_tree(core)
+    export_tree(tree, 'core.png')
