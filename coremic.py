@@ -64,61 +64,28 @@ class OriginalBiom(ndb.Model):
     params_str = ndb.JsonProperty()
 
 
-# this cane be changed later to allow splitting in more than two groups
+# this can be changed later to allow splitting in more than two groups
 def divide_list(a, lengths):
     # a[start:end] # items start through end-1
     return a[:lengths[0]], a[lengths[0]:]
 
 
-def shuffle_dict_coremic_serial_dict(entty, ndb_custom_key, otu_table_biom):
-    '''
-     get the randomized dict and run core microbiome
-    '''
-    local_dict_frac_thresh_otus = dict()
-    if entty['idx'] == ndb_custom_key:
-        rand_mapping_info_dict = entty['dict']
-        # Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-        OUTPFILE, c, group, rand_iter_numb = entty['entry_id'].split('~~~~')
-        rand_mapping_info_list = convert_shuffled_dict_to_str(
-            rand_mapping_info_dict, c)
-        rand_o_dir = rand_iter_numb + OUTPFILE
-        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
-                                      rand_mapping_info_list, c, group)
-
-        # arrange the results to look pretty
-        # return the items in sorted order
-        for r_frac_thresh, r_core_OTUs_biom in (
-                sorted(result['frac_thresh_core_OTUs_biom'].items(),
-                       key=(lambda (key, value): int(key)))):
-            r_OTUs, r_biom = r_core_OTUs_biom
-            ndb_custom_key_r_frac_thres = (ndb_custom_key + '~~~~' +
-                                           r_frac_thresh)
-            if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
-                print "Why do you have same fraction thresholds repeating?"
-            else:
-                local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = (
-                    r_OTUs)
-
-    return local_dict_frac_thresh_otus  # change this to something useful
-
-
-def shuffle_dicts(a):           # takes dictionary
+def shuffle_dicts(d):           # takes dictionary
     # If items(), keys(), values() are called with no intervening
     # modifications to the dictionary, the lists will directly correspond.
-    keys = a.keys()
-    values, lengths = get_values_from_dict(a)
+    keys = d.keys()
+    values, lengths = get_values_from_dict(d)
     random.shuffle(values)
     new_values = divide_list(values, lengths)
-    categ_samples_dict_shuffled = dict(zip(keys, new_values))
-    return categ_samples_dict_shuffled
+    return dict(zip(keys, new_values))
 
 
 # takes iternumb which is number of random iteration and dictionary
 def check_map_file_has_two_groups(a):
     values, lengths = get_values_from_dict(a)
     if len(lengths) > 2:
-        return "No"
-    return "Yes"
+        return False
+    return True
 
 
 def get_values_from_dict(a):
@@ -198,65 +165,45 @@ def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM,
                     true_results=true_result_frac_thresh_otus_dict).put()
     print ("Processed %s fraction thresholds for true data" %
            str(len(true_result_frac_thresh_otus_dict)))
-    return true_result_frac_thresh_otus_dict
 
 
-def create_shuffled_dicts_no_datastore(i, categ_samples_dict, ndb_custom_key,
-                                       otu_table_biom):
-        '''
-        The following section creates shuffled dictionaries and puts them in
-        datastore
-        '''
-
-        shuffled_dict = shuffle_dicts(categ_samples_dict)
-        ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
-        local_dict_frac_thresh_otus = (
-            shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
-                                                       ndb_custom_key,
-                                                       ndb_custom_key_entry,
-                                                       otu_table_biom))
-        return local_dict_frac_thresh_otus
-
-
-def shuffle_dict_coremic_serial_dict_datastore(rand_mapping_info_dict,
+def shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
                                                ndb_custom_key,
                                                ndb_custom_key_entry,
                                                otu_table_biom):
-        '''
-        get the randomized dict and run core microbiome
-        '''
+    '''
+    get the randomized dict and run core microbiome
+    '''
 
-        local_dict_frac_thresh_otus = dict()
-        # Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-        OUTPFILE, c, group, rand_iter_numb = ndb_custom_key_entry.split('~~~~')
-        rand_mapping_info_list = convert_shuffled_dict_to_str(
-            rand_mapping_info_dict, c)
-        rand_o_dir = rand_iter_numb + OUTPFILE
-        result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
-                                      rand_mapping_info_list, c, group)
+    local_dict_frac_thresh_otus = dict()
+    # Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
+    OUTPFILE, c, group, rand_iter_numb = ndb_custom_key_entry.split('~~~~')
+    rand_mapping_info_list = convert_shuffled_dict_to_str(
+        shuffled_dict, c)
+    rand_o_dir = rand_iter_numb + OUTPFILE
+    result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
+                                  rand_mapping_info_list, c, group)
 
-        # arrange the results to look pretty
-        # return the items in sorted order
-        for r_frac_thresh, r_core_OTUs_biom in (
-                sorted(result['frac_thresh_core_OTUs_biom'].items(),
-                       key=lambda (key, value): int(key))):
-            r_OTUs, r_biom = r_core_OTUs_biom
+    # arrange the results to look pretty
+    # return the items in sorted order
+    for r_frac_thresh, r_core_OTUs_biom in (
+            sorted(result['frac_thresh_core_OTUs_biom'].items(),
+                   key=lambda (key, value): int(key))):
+        r_OTUs, r_biom = r_core_OTUs_biom
 
-            ndb_custom_key_r_frac_thres = (ndb_custom_key + '~~~~' +
-                                           r_frac_thresh)
+        ndb_custom_key_r_frac_thres = (ndb_custom_key + '~~~~' +
+                                       r_frac_thresh)
 
-            if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
-                print "Why do you have same fraction thresholds repeating?"
-            else:
-                local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = (
-                    r_OTUs)
+        if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
+            print "Why do you have same fraction thresholds repeating?"
+        else:
+            local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = (
+                r_OTUs)
 
-        fatherres_idx = 'fatherresults' + ndb_custom_key
-        Result_RandomDict(parent=ndb.Key(Result_RandomDict, fatherres_idx),
-                          idx=ndb_custom_key,
-                          otus=local_dict_frac_thresh_otus).put()
-
-        return local_dict_frac_thresh_otus  # change this to something useful
+    fatherres_idx = 'fatherresults' + ndb_custom_key
+    Result_RandomDict(parent=ndb.Key(Result_RandomDict, fatherres_idx),
+                      idx=ndb_custom_key,
+                      otus=local_dict_frac_thresh_otus).put()
 
 
 def calc_significance(indx_sampleid, indx_categ, errors_list,
@@ -274,7 +221,7 @@ def calc_significance(indx_sampleid, indx_categ, errors_list,
     categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',',
                                       'current', indx_categ, indx_sampleid)
 
-    if check_map_file_has_two_groups(categ_samples_dict) == "No":
+    if not check_map_file_has_two_groups(categ_samples_dict):
         errors_list.append('\nERROR: Following code divides samples in ' +
                            '>TWO groups. Change the mapping file to only '
                            'have two groups (e.g. A vs D)\n')
@@ -287,8 +234,12 @@ def calc_significance(indx_sampleid, indx_categ, errors_list,
 
     print "Creating shuffled dicts"
     for i in range(NTIMES):
-        create_shuffled_dicts_no_datastore(i, categ_samples_dict,
-                                           ndb_custom_key, otu_table_biom)
+        shuffled_dict = shuffle_dicts(categ_samples_dict)
+        ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
+        shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
+                                                   ndb_custom_key,
+                                                   ndb_custom_key_entry,
+                                                   otu_table_biom)
 
 
 def compile_all_results_perform_sign_calc(ndb_custom_key,
@@ -378,9 +329,7 @@ def compile_all_results_perform_sign_calc(ndb_custom_key,
                 otu = '%s\t%s\t%s\t%s\n' % (o, freq, otus_pval, new_p_v)
                 sign_results += otu
             counter += 1
-
-    send_results_as_email(ndb_custom_key, user_args, sign_results, to_email)
-    return sign_results         # r_out_str #result['otu_counts'] # '1'
+    return sign_results
 
 
 # the user id needs to be changed to that input by the user
@@ -405,11 +354,8 @@ The Core Microbiome Team
 
 """
     msg_str += user_args
-
     message.body = msg_str
-
     message.attachments = ['results.tsv', msg.encode('utf-8')]
-
     message.send()
 
 
@@ -690,8 +636,8 @@ class ProcessResults(webapp2.RequestHandler):
                 local_dict_frac_thresh_otus = q_dict['otus']
                 for ndb_custom_key_r_frac_thres, r_OTUs in (
                         local_dict_frac_thresh_otus.items()):
-                    if ndb_custom_key_r_frac_thres in (
-                            glob_qry_entries_in_result_rand_dict):
+                    if ndb_custom_key_r_frac_thres in \
+                       glob_qry_entries_in_result_rand_dict:
                         glob_qry_entries_in_result_rand_dict[
                             ndb_custom_key_r_frac_thres].append(r_OTUs)
                     else:
@@ -704,10 +650,12 @@ class ProcessResults(webapp2.RequestHandler):
 
             user_args = (tmp_user_args + '\n# of randomizations: ' +
                          str(NTIMES) + '\n\n\n')
-            compile_all_results_perform_sign_calc(
+            sign_results = compile_all_results_perform_sign_calc(
                 otu_table_biom_o, glob_qry_entries_in_result_rand_dict,
                 user_args, to_email, p_val_adj, DELIM,
                 true_result_frac_thresh_otus_dict, NTIMES)
+            send_results_as_email(otu_table_biom_o, user_args, sign_results,
+                                  to_email)
             # may want to purge remaining tasks, be careful since you do not
             # want to delete someone
             # else's tasks
