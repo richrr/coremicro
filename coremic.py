@@ -242,6 +242,20 @@ def calc_significance(indx_sampleid, indx_categ, errors_list,
                                                    otu_table_biom)
 
 
+def format_results(results, p_val_adj):
+    sign_results = (('Significant results:\nOTU\tFreq. in randomized ' +
+                     'data\tpval=freq/times randomized\t%s corrected pval\n')
+                    % p_val_adj)
+    for frac in results:
+        sign_results += '\n#Frac thresh %s\n' % str(frac)
+        for otu in results[frac]:
+            sign_results += '%s\t%s\t%s\t%s\n' % (otu['otu'], otu['freq'],
+                                                  otu['pval'],
+                                                  otu['corrected_pval'])
+    return sign_results
+
+
+
 def compile_all_results_perform_sign_calc(ndb_custom_key,
                                           glob_qry_entries_in_result_rand_dict,
                                           user_args, to_email, p_val_adj,
@@ -253,16 +267,12 @@ def compile_all_results_perform_sign_calc(ndb_custom_key,
     calculates stats.
     '''
     print "Compiling results"
-    sign_results = (('Significant results:\nOTU\tFreq. in randomized ' +
-                     'data\tpval=freq/times randomized\t%s corrected pval\n')
-                    % p_val_adj)
     p_val = 0.05
-
+    results = {}
     # compile results; print the number of random occurances for each true
     # core microbiome otu (checks significance)
     for frac_s in [75, 80, 85, 90, 95, 100]:
-        sign_results += '\n#Frac thresh %s\n' % str(frac_s)
-
+        results[frac_s] = []
         ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
 
         # this number should be equal to the number of randomizations
@@ -298,7 +308,6 @@ def compile_all_results_perform_sign_calc(ndb_custom_key,
                 freq = int(randomized_otus[o])
             otus_pval = freq/float(NTIMES)
             if otus_pval < p_val:
-                otu = '%s\t%s\t%s\n' % (o, freq, otus_pval)
                 signif_core_microb_otu_dict[o] = otus_pval
 
         # check if there is at least one significant entry so far:
@@ -326,10 +335,15 @@ def compile_all_results_perform_sign_calc(ndb_custom_key,
             otus_pval = freq/float(NTIMES)
             new_p_v = new_p_vals[counter]  # p value after correction
             if new_p_v < p_val:
-                otu = '%s\t%s\t%s\t%s\n' % (o, freq, otus_pval, new_p_v)
-                sign_results += otu
+                results[frac_s].append({
+                    'otu': o,
+                    'freq': freq,
+                    'pval': otus_pval,
+                    'corrected_pval': new_p_v,
+                    'threshold': frac_s,
+                })
             counter += 1
-    return sign_results
+    return results
 
 
 # the user id needs to be changed to that input by the user
@@ -650,11 +664,12 @@ class ProcessResults(webapp2.RequestHandler):
 
             user_args = (tmp_user_args + '\n# of randomizations: ' +
                          str(NTIMES) + '\n\n\n')
-            sign_results = compile_all_results_perform_sign_calc(
+            results = compile_all_results_perform_sign_calc(
                 otu_table_biom_o, glob_qry_entries_in_result_rand_dict,
                 user_args, to_email, p_val_adj, DELIM,
                 true_result_frac_thresh_otus_dict, NTIMES)
-            send_results_as_email(otu_table_biom_o, user_args, sign_results,
+            results_string = format_results(results)
+            send_results_as_email(otu_table_biom_o, user_args, results_string,
                                   to_email)
             # may want to purge remaining tasks, be careful since you do not
             # want to delete someone
