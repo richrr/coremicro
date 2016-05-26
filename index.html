@@ -47,6 +47,15 @@
           </p>
         </div>
         <div class="form-group">
+          <label for="group">Out group</label><br>
+	  <input type="text" id="out_group" name="out_group" placeholder="Bad" size="30" required>
+          <p class="help-block">
+            Enter EXACT string of the out group on which you want core microbiome analysis to be performed.<br>
+            This is used for generating the phylogenetic tree of the results.
+            To to use the "Bad" under the "Person" group, enter "Bad", assuming that the "Person" group was set in the Interest group field
+          </p>
+        </div>
+        <div class="form-group">
           <label for="random">Number of randomizations</label><br>
 	  <input type="number" name="random" value="1000" size="30" step="50" max="1500" min="50" required>
           <p class="help-block">

@@ -64,8 +64,8 @@ class ProcessResults(webapp2.RequestHandler):
                         glob_qry_entries_in_result_rand_dict[
                             ndb_custom_key_r_frac_thres] = [r_OTUs]
             (tmp_user_args, to_email, p_val_adj, DELIM, NTIMES,
-             otu_table_biom, g_info_list, factor, group, OUTPFILE) = (
-                 get_required_params_from_orig_dict(otu_table_biom_o))
+             otu_table_biom, g_info_list, factor, group, out_group,
+             OUTPFILE) = (get_required_params_from_orig_dict(otu_table_biom_o))
             NTIMES = int(numb_tasks)*50
 
             user_args = (tmp_user_args + '\n# of randomizations: ' +

@@ -14,18 +14,19 @@ from utilities import compile_results, get_required_params_from_orig_dict
 
 class ProcessData(webapp2.RequestHandler):
     def post(self):
-        otu_table_biom_o = self.request.get("otu_table_biom_key")
-        true_random = self.request.get("true_random")
+        otu_table_biom_o = self.request.get('otu_table_biom_key')
+        mode = self.request.get('mode')
 
         # get rid of this orig biom and use only the method
         # also move the true results to a separate task to avoid redoing work
         user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
-            g_info_list, factor, group, OUTPFILE = (
+            g_info_list, factor, group, out_group, OUTPFILE = (
                 get_required_params_from_orig_dict(otu_table_biom_o))
 
         indx_sampleid, indx_categ, errors_list = validate_inputs(
             'ndb_custom_key', 'user_args', otu_table_biom, factor, group,
-            g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+            out_group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE,
+            to_email)
         # temp hack since blobstore randomly swaps file order during upload
         if len(errors_list) > 0:
             tmp = g_info_list
@@ -34,7 +35,8 @@ class ProcessData(webapp2.RequestHandler):
             # retry with swapped files
             indx_sampleid, indx_categ, errors_list = validate_inputs(
                 'ndb_custom_key', 'user_args', otu_table_biom, factor, group,
-                g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE, to_email)
+                out_group, g_info_list, p_val_adj, DELIM, int(NTIMES),
+                OUTPFILE, to_email)
             if len(errors_list) > 0:  # just give up on this
                 print '\n'.join(errors_list)
                 # put code here so that the code doesn't run further
@@ -46,11 +48,15 @@ class ProcessData(webapp2.RequestHandler):
 
         # this is to query all entries in this run
         ndb_custom_key = OUTPFILE + '~~~~' + factor + '~~~~' + group
+        ndb_custom_key_out = OUTPFILE + '~~~~' + factor + '~~~~' + out_group
 
-        if true_random == "true":
+        if mode == 'true':
             run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
                           group, DELIM, ndb_custom_key)
-        elif true_random == "random":
+        elif mode == 'out':
+            run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
+                          group, DELIM, ndb_custom_key_out)
+        elif mode == 'random':
             calc_significance(indx_sampleid, indx_categ, errors_list,
                               otu_table_biom, factor, group, g_info_list,
                               p_val_adj, DELIM, int(NTIMES), OUTPFILE,
@@ -205,8 +211,8 @@ def check_map_file_has_two_groups(a):
 
 
 def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group,
-                    mapping_info_list, p_val_adj, DELIM, NTIMES, OUTPFILE,
-                    to_email):
+                    out_group, mapping_info_list, p_val_adj, DELIM, NTIMES,
+                    OUTPFILE, to_email):
     # find index of SampleID and category to be summarized. e.g. swg or non-swg
     labels = mapping_info_list[0].split(DELIM)
     indx_sampleid = indx_categ = ''
