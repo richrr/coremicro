@@ -38,15 +38,11 @@ class ProcessResults(webapp2.RequestHandler):
         qry_entries_in_result_randomdict = Result_RandomDict.query(
             Result_RandomDict.idx == otu_table_biom_o,
             ancestor=ndb.Key(Result_RandomDict, fatherres_idx))
-        qry_entries_in_result_randomdict_count = Result_RandomDict.query(
-            Result_RandomDict.idx == otu_table_biom_o,
-            ancestor=ndb.Key(Result_RandomDict, fatherres_idx)
-        ).count(limit=100000)
-        print ("Counts", qry_entries_in_result_randomdict_count,
-               qry_entries_in_result_Truedict.count(),
+        print ("Counts", qry_entries_in_result_Truedict.count(),
                qry_entries_in_result_randomdict.count())
 
-        if int(qry_entries_in_result_randomdict_count) == (int(numb_tasks)*50):
+        if int(qry_entries_in_result_randomdict.count()) \
+           == (int(numb_tasks)*50):
             print "Previous work completed, can move for final stage!"
             # merge all the available dictionaries into one
             glob_qry_entries_in_result_rand_dict = dict()
