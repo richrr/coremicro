@@ -10,6 +10,7 @@ from utils import list_to_dict
 
 from storage import Result_RandomDict, Result_TrueDict
 from utilities import compile_results, get_required_params_from_orig_dict
+from email_results import send_results_as_email
 
 
 class ProcessData(webapp2.RequestHandler):
