@@ -6,8 +6,8 @@ import sys
 import random
 from utils import list_to_dict
 
-from storage import Result_RandomDict, Result_TrueDict
-from utilities import compile_results, get_required_params_from_orig_dict
+from storage import Result_RandomDict, Result_TrueDict, OriginalBiom
+from utilities import compile_results
 from email_results import send_results_as_email
 
 
@@ -19,8 +19,8 @@ class ProcessData(webapp2.RequestHandler):
         # get rid of this orig biom and use only the method
         # also move the true results to a separate task to avoid redoing work
         user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
-            g_info_list, factor, group, out_group, OUTPFILE = (
-                get_required_params_from_orig_dict(otu_table_biom_o))
+            g_info_list, factor, group, out_group, OUTPFILE = \
+            OriginalBiom.get_params(otu_table_biom_o)
 
         indx_sampleid, indx_categ, errors_list = validate_inputs(
             'ndb_custom_key', 'user_args', otu_table_biom, factor, group,

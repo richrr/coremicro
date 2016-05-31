@@ -135,3 +135,27 @@ class OriginalBiom(ndb.Model):
         for entry in entries:
             entry.key.delete()
         parent_key.delete()
+
+    @classmethod
+    def get_params(cls, key):
+        q_dict = cls.get_entry(key).to_dict()
+
+        params = q_dict['params_str']  # this is a dictionary
+        factor = params['factor']
+        group = params['group']
+        out_group = params['out_group']
+        p_val_adj = params['p_val_adj']
+        DELIM = params['delim']
+        NTIMES = params['ntimes']
+        OUTPFILE = params['outpfile']
+        to_email = params['to_email']
+
+        otu_table_biom = q_dict['biom']
+        g_info_list = params['g_info_not_list'].split('\n')
+        user_args = (('You selected the following parameters:\n' +
+                      'Factor: %s\nGroup: %s\nPval correction: %s')
+                     % (factor, group, p_val_adj))
+
+        return (user_args, to_email, p_val_adj, DELIM, NTIMES,
+                otu_table_biom, g_info_list, factor, group, out_group,
+                OUTPFILE)

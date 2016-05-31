@@ -5,9 +5,10 @@ import collections
 from google.appengine.api import taskqueue
 from google.appengine.api.taskqueue import TaskRetryOptions
 
-from utilities import compile_results, get_required_params_from_orig_dict
+from utilities import compile_results
 from email_results import send_results_as_email
-from storage import Result_RandomDict, Result_TrueDict, clean_storage
+from storage import (Result_RandomDict, Result_TrueDict, OriginalBiom,
+                     clean_storage)
 
 
 class ProcessResults(webapp2.RequestHandler):
@@ -40,7 +41,7 @@ class ProcessResults(webapp2.RequestHandler):
                             ndb_custom_key_r_frac_thres] = [r_OTUs]
             (tmp_user_args, to_email, p_val_adj, DELIM, NTIMES,
              otu_table_biom, g_info_list, factor, group, out_group,
-             OUTPFILE) = (get_required_params_from_orig_dict(otu_table_biom_o))
+             OUTPFILE) = OriginalBiom.get_params(otu_table_biom_o)
             NTIMES = int(numb_tasks)*50
 
             user_args = (tmp_user_args + '\n# of randomizations: ' +
