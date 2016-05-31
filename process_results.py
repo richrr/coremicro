@@ -70,7 +70,7 @@ class ProcessResults(webapp2.RequestHandler):
                                   'numb_tasks': numb_tasks},
                           retry_options=TaskRetryOptions(task_retry_limit=0,
                                                          task_age_limit=1),
-                          countdown=1)
+                          countdown=60)
 
 
 def format_results(results, p_val_adj):
