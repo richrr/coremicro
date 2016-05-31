@@ -1,7 +1,5 @@
 import webapp2
 
-from google.appengine.ext import ndb
-
 from time import localtime, strftime
 
 import string
@@ -10,7 +8,7 @@ import random
 from google.appengine.api import taskqueue
 from google.appengine.api.taskqueue import TaskRetryOptions
 
-from storage import Result_RandomDict, Result_TrueDict, OriginalBiom
+from storage import init_storage
 
 
 class MainPage(webapp2.RequestHandler):
@@ -55,28 +53,8 @@ class MainPage(webapp2.RequestHandler):
             'outpfile': OUTPFILE,
             'to_email': to_email,
         }
-        # temporary hack to clear out the Datastore
-        # http://stackoverflow.com/questions/1062540/how-to-delete-all-datastore-in-google-app-engine
-        # ndb.delete_multi(RandomDict.query().fetch(keys_only=True))
-        # ndb.delete_multi(ResultFile.query().fetch(keys_only=True))
-        # uncomment this to clear out datastore every time
-        ndb.delete_multi(Result_RandomDict.query().fetch(keys_only=True))
-        ndb.delete_multi(OriginalBiom.query().fetch(keys_only=True))
-        ndb.delete_multi(Result_TrueDict.query().fetch(keys_only=True))
 
-        origb_idx = 'origbiom' + ndb_custom_key_o
-        OriginalBiom(id=origb_idx).put()  # the datastore of original biom
-        OriginalBiom(parent=ndb.Key(OriginalBiom, origb_idx),
-                     idx=ndb_custom_key_o, biom=otu_table_biom,
-                     params_str=local_string_hack_dict).put()
-
-        fatherres_idx = 'fatherresults' + ndb_custom_key_o
-        # the datastore of results from random dicts
-        Result_RandomDict(id=fatherres_idx).put()
-
-        fatherrestrue_idx = 'fatherresultstrue' + ndb_custom_key_o
-        # the datastore of results from random dicts
-        Result_TrueDict(id=fatherrestrue_idx).put()
+        init_storage(ndb_custom_key_o, otu_table_biom, local_string_hack_dict)
 
         numb_tasks = int(NTIMES)/50
         # try to break the randomizations into n tasks of 50 randomizations

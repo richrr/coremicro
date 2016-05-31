@@ -1,7 +1,5 @@
 import webapp2
 
-from google.appengine.ext import ndb
-
 import collections
 
 from google.appengine.api import taskqueue
@@ -9,7 +7,7 @@ from google.appengine.api.taskqueue import TaskRetryOptions
 
 from utilities import compile_results, get_required_params_from_orig_dict
 from email_results import send_results_as_email
-from storage import Result_RandomDict, Result_TrueDict
+from storage import Result_RandomDict, Result_TrueDict, clean_storage
 
 
 class ProcessResults(webapp2.RequestHandler):
@@ -17,29 +15,10 @@ class ProcessResults(webapp2.RequestHandler):
         otu_table_biom_o = self.request.get("otu_table_biom_key")
         numb_tasks = self.request.get("numb_tasks")
 
-        fatherrestrue_idx = 'fatherresultstrue' + otu_table_biom_o
-        true_result_frac_thresh_otus_dict = dict()
-        qry_entries_in_result_Truedict = Result_TrueDict.query(
-            Result_TrueDict.idx == otu_table_biom_o,
-            ancestor=ndb.Key(Result_TrueDict, fatherrestrue_idx))
-
-        if int(qry_entries_in_result_Truedict.count()) == 1:
-            print "Read single entry from Truedict datastore!"
-        else:
-            # do something useful here
-            print "Single entry not found from Truedict datastore, some error!"
-
-        for t in qry_entries_in_result_Truedict:
-            t_dict = t.to_dict()
-            true_result_frac_thresh_otus_dict = t_dict['true_results']
-            break
-
-        fatherres_idx = 'fatherresults' + otu_table_biom_o
-        qry_entries_in_result_randomdict = Result_RandomDict.query(
-            Result_RandomDict.idx == otu_table_biom_o,
-            ancestor=ndb.Key(Result_RandomDict, fatherres_idx))
-        print ("Counts", qry_entries_in_result_Truedict.count(),
-               qry_entries_in_result_randomdict.count())
+        true_result_frac_thresh_otus_dict = Result_TrueDict\
+            .get_entry(otu_table_biom_o).to_dict()['true_results']
+        qry_entries_in_result_randomdict = \
+            Result_RandomDict.get_entries(otu_table_biom_o)
 
         if int(qry_entries_in_result_randomdict.count()) \
            == (int(numb_tasks)*50):
@@ -73,6 +52,8 @@ class ProcessResults(webapp2.RequestHandler):
             results_string = format_results(results, p_val_adj)
             send_results_as_email(otu_table_biom_o, user_args, results_string,
                                   to_email)
+            # Clear things put in the datastore
+            clean_storage(otu_table_biom_o)
             # may want to purge remaining tasks, be careful since you do not
             # want to delete someone
             # else's tasks

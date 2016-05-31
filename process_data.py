@@ -1,7 +1,5 @@
 import webapp2
 
-from google.appengine.ext import ndb
-
 from compute_core_microbiome import exec_core_microb_cmd
 
 import sys
@@ -60,7 +58,7 @@ class ProcessData(webapp2.RequestHandler):
         elif mode == 'random':
             calc_significance(indx_sampleid, indx_categ, errors_list,
                               otu_table_biom, factor, group, g_info_list,
-                              p_val_adj, DELIM, int(NTIMES), OUTPFILE,
+                              p_val_adj, DELIM, 50, OUTPFILE,
                               to_email)
 
 
@@ -82,10 +80,8 @@ def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM,
         true_result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs,
                                                                          DELIM)
 
-    fatherrestrue_idx = 'fatherresultstrue' + ndb_custom_key
-    Result_TrueDict(parent=ndb.Key(Result_TrueDict, fatherrestrue_idx),
-                    idx=ndb_custom_key,
-                    true_results=true_result_frac_thresh_otus_dict).put()
+    Result_TrueDict.add_entry(ndb_custom_key,
+                              true_result_frac_thresh_otus_dict)
     print ("Processed %s fraction thresholds for true data" %
            str(len(true_result_frac_thresh_otus_dict)))
 
@@ -159,10 +155,7 @@ def shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
             local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = (
                 r_OTUs)
 
-    fatherres_idx = 'fatherresults' + ndb_custom_key
-    Result_RandomDict(parent=ndb.Key(Result_RandomDict, fatherres_idx),
-                      idx=ndb_custom_key,
-                      otus=local_dict_frac_thresh_otus).put()
+    Result_RandomDict.add_entry(ndb_custom_key, local_dict_frac_thresh_otus)
 
 
 def convert_shuffled_dict_to_str(DICT, categ):
