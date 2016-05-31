@@ -16,51 +16,31 @@ class ProcessResults(webapp2.RequestHandler):
         otu_table_biom_o = self.request.get("otu_table_biom_key")
         numb_tasks = self.request.get("numb_tasks")
 
-        true_result_frac_thresh_otus_dict = Result_TrueDict\
-            .get_entry(otu_table_biom_o).to_dict()['true_results']
-        qry_entries_in_result_randomdict = \
-            Result_RandomDict.get_entries(otu_table_biom_o)
+        random = Result_RandomDict.get_entries(otu_table_biom_o)
 
-        if int(qry_entries_in_result_randomdict.count()) \
-           == (int(numb_tasks)*50):
+        if int(random.count()) == (int(numb_tasks)*50):
             print "Previous work completed, can move for final stage!"
-            # merge all the available dictionaries into one
-            glob_qry_entries_in_result_rand_dict = dict()
-
-            for q in qry_entries_in_result_randomdict:
-                q_dict = q.to_dict()
-                local_dict_frac_thresh_otus = q_dict['otus']
-                for ndb_custom_key_r_frac_thres, r_OTUs in (
-                        local_dict_frac_thresh_otus.items()):
-                    if ndb_custom_key_r_frac_thres in \
-                       glob_qry_entries_in_result_rand_dict:
-                        glob_qry_entries_in_result_rand_dict[
-                            ndb_custom_key_r_frac_thres].append(r_OTUs)
-                    else:
-                        glob_qry_entries_in_result_rand_dict[
-                            ndb_custom_key_r_frac_thres] = [r_OTUs]
-            (tmp_user_args, to_email, p_val_adj, DELIM, NTIMES,
+            (user_args, to_email, p_val_adj, DELIM, NTIMES,
              otu_table_biom, g_info_list, factor, group, out_group,
              OUTPFILE) = OriginalBiom.get_params(otu_table_biom_o)
-            NTIMES = int(numb_tasks)*50
 
-            user_args = (tmp_user_args + '\n# of randomizations: ' +
-                         str(NTIMES) + '\n\n\n')
-            results = compile_all_results_perform_sign_calc(
-                otu_table_biom_o, glob_qry_entries_in_result_rand_dict,
-                user_args, to_email, p_val_adj, DELIM,
-                true_result_frac_thresh_otus_dict, NTIMES)
+            true = Result_TrueDict.get_entry(otu_table_biom_o).to_dict()[
+                'true_results']
+            results = process(true, random, otu_table_biom_o, numb_tasks,
+                              p_val_adj, DELIM)
+            out_true = Result_TrueDict.get_entry(otu_table_biom_o,
+                                                 out_group=True).to_dict()[
+                                                     'true_results']
+            out_random = Result_RandomDict.get_entries(otu_table_biom_o,
+                                                       out_group=True)
+            out_results = process(out_true, out_random, otu_table_biom_o,
+                                  numb_tasks, p_val_adj, DELIM)
+            user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
             results_string = format_results(results, p_val_adj)
             send_results_as_email(otu_table_biom_o, user_args, results_string,
                                   to_email)
-            # Clear things put in the datastore
+
             clean_storage(otu_table_biom_o)
-            # may want to purge remaining tasks, be careful since you do not
-            # want to delete someone
-            # else's tasks
-            # Purge entire queue...
-            # purgeq = taskqueue.Queue('default')
-            # purgeq.purge()
 
         else:
             # do something useful here
@@ -71,6 +51,26 @@ class ProcessResults(webapp2.RequestHandler):
                           retry_options=TaskRetryOptions(task_retry_limit=0,
                                                          task_age_limit=1),
                           countdown=60)
+
+
+def process(true, random, key, numb_tasks, p_val_adj, DELIM):
+    # merge all the available dictionaries into one
+    glob_qry_entries_in_result_rand_dict = dict()
+    for q in random:
+        q_dict = q.to_dict()
+        local_dict_frac_thresh_otus = q_dict['otus']
+        for ndb_custom_key_r_frac_thres, r_OTUs in (
+                local_dict_frac_thresh_otus.items()):
+            if ndb_custom_key_r_frac_thres in \
+               glob_qry_entries_in_result_rand_dict:
+                glob_qry_entries_in_result_rand_dict[
+                    ndb_custom_key_r_frac_thres].append(r_OTUs)
+            else:
+                glob_qry_entries_in_result_rand_dict[
+                    ndb_custom_key_r_frac_thres] = [r_OTUs]
+    NTIMES = int(numb_tasks)*50
+    return compile_all_results_perform_sign_calc(key, random, p_val_adj,
+                                                 DELIM, true, NTIMES)
 
 
 def format_results(results, p_val_adj):
@@ -88,8 +88,7 @@ def format_results(results, p_val_adj):
 
 def compile_all_results_perform_sign_calc(ndb_custom_key,
                                           glob_qry_entries_in_result_rand_dict,
-                                          user_args, to_email, p_val_adj,
-                                          DELIM,
+                                          p_val_adj, DELIM,
                                           true_result_frac_thresh_otus_dict,
                                           NTIMES):
     '''

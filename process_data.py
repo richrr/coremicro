@@ -45,26 +45,22 @@ class ProcessData(webapp2.RequestHandler):
         else:
             print 'No file swapping needed!'
 
-        # this is to query all entries in this run
-        ndb_custom_key = OUTPFILE + '~~~~' + factor + '~~~~' + group
-        ndb_custom_key_out = OUTPFILE + '~~~~' + factor + '~~~~' + out_group
-
         if mode == 'true':
             run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
-                          group, DELIM, ndb_custom_key)
+                          group, DELIM, otu_table_biom_o)
         elif mode == 'out':
             run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
-                          group, DELIM, ndb_custom_key_out)
+                          group, DELIM, otu_table_biom_o, out_group=True)
         elif mode == 'random':
             calc_significance(indx_sampleid, indx_categ, errors_list,
                               otu_table_biom, factor, group, g_info_list,
                               p_val_adj, DELIM, 50, OUTPFILE,
-                              to_email)
+                              to_email, otu_table_biom_o, out_group)
 
 
 # run core microbiome on original data
 def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM,
-                  ndb_custom_key):
+                  ndb_custom_key, out_group=False):
     o_dir = 'true_result' + OUTPFILE
     result = exec_core_microb_cmd(otu_table_biom, o_dir, mapping_info_list,
                                   c, group)
@@ -81,18 +77,16 @@ def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM,
                                                                          DELIM)
 
     Result_TrueDict.add_entry(ndb_custom_key,
-                              true_result_frac_thresh_otus_dict)
+                              true_result_frac_thresh_otus_dict, out_group)
     print ("Processed %s fraction thresholds for true data" %
            str(len(true_result_frac_thresh_otus_dict)))
 
 
 def calc_significance(indx_sampleid, indx_categ, errors_list,
                       otu_table_biom, c, group, mapping_info_list,
-                      p_val_adj, DELIM, NTIMES, OUTPFILE, to_email):
+                      p_val_adj, DELIM, NTIMES, OUTPFILE, to_email, key,
+                      out_group):
 
-    # global ndb_custom_key
-    # this is to query all entries in this run
-    ndb_custom_key = OUTPFILE + '~~~~' + c + '~~~~' + group
     user_args = (('You selected the following parameters:\nFactor: %s\n' +
                   'Group: %s\nPval correction: %s\n' +
                   '# of randomizations: %s\n\n\n')
@@ -108,34 +102,36 @@ def calc_significance(indx_sampleid, indx_categ, errors_list,
 
     # email the error and quit, no point to continue further
     if len(errors_list) > 0:
-        send_results_as_email(ndb_custom_key, user_args,
+        send_results_as_email(key, user_args,
                               '\n'.join(errors_list), to_email)
         # put code here so that the code doesn't run further
 
     print "Creating shuffled dicts"
     for i in range(NTIMES):
         shuffled_dict = shuffle_dicts(categ_samples_dict)
-        ndb_custom_key_entry = ndb_custom_key + '~~~~' + str(i)
+        ndb_custom_key_entry = key + '~~~~' + str(i)
         shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
-                                                   ndb_custom_key,
+                                                   key,
                                                    ndb_custom_key_entry,
-                                                   otu_table_biom)
+                                                   otu_table_biom, OUTPFILE, c,
+                                                   group, out_group,
+                                                   i)
 
 
 def shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
                                                ndb_custom_key,
                                                ndb_custom_key_entry,
-                                               otu_table_biom):
+                                               otu_table_biom, OUTPFILE, c,
+                                               group, out_group,
+                                               rand_iter_numb):
     '''
     get the randomized dict and run core microbiome
     '''
 
     local_dict_frac_thresh_otus = dict()
-    # Zen-outputMon-07-Mar-2016-01:36:13-AM~~~~Plant~~~~Sw~~~~2
-    OUTPFILE, c, group, rand_iter_numb = ndb_custom_key_entry.split('~~~~')
     rand_mapping_info_list = convert_shuffled_dict_to_str(
         shuffled_dict, c)
-    rand_o_dir = rand_iter_numb + OUTPFILE
+    rand_o_dir = str(rand_iter_numb) + OUTPFILE
     result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
                                   rand_mapping_info_list, c, group)
 

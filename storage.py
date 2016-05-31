@@ -27,24 +27,25 @@ class Result_RandomDict(ndb.Model):
     idx = ndb.StringProperty()  # the run id
     # the core otus from the (shuffled) dictionary as a json
     otus = ndb.JsonProperty()
+    is_out_group = ndb.BooleanProperty(default=False)
 
     @staticmethod
     def get_parent_key(key):
         return 'fatherresults' + key
 
     @classmethod
-    def add_entry(cls, key, results):
-        return cls(parent=ndb.Key(cls, cls.get_parent_key(key)),
-                   idx=key, otus=results).put()
-
-    @classmethod
-    def get_entries(cls, key):
-        return cls.query(cls.idx == key,
-                         ancestor=ndb.Key(cls, cls.get_parent_key(key)))
-
-    @classmethod
     def add_parent(cls, key):
         return cls(id=cls.get_parent_key(key)).put()
+
+    @classmethod
+    def add_entry(cls, key, results, out_group=False):
+        return cls(parent=ndb.Key(cls, cls.get_parent_key(key)),
+                   idx=key, otus=results, is_out_group=out_group).put()
+
+    @classmethod
+    def get_entries(cls, key, out_group=False):
+        return cls.query(cls.idx == key, cls.is_out_group == out_group,
+                         ancestor=ndb.Key(cls, cls.get_parent_key(key)))
 
     @classmethod
     def delete_entries(cls, key):
@@ -60,19 +61,24 @@ class Result_TrueDict(ndb.Model):
     idx = ndb.StringProperty()  # the run id
     # the core biom from the true dictionary as a json
     true_results = ndb.JsonProperty()
+    is_out_group = ndb.BooleanProperty(default=False)
 
     @staticmethod
     def get_parent_key(key):
         return 'fatherresultstrue' + key
 
     @classmethod
-    def add_entry(cls, key, results):
-        return cls(parent=ndb.Key(cls, cls.get_parent_key(key)),
-                   idx=key, true_results=results).put()
+    def add_parent(cls, key):
+        return cls(id=cls.get_parent_key(key)).put()
 
     @classmethod
-    def get_entry(cls, key):
-        result = cls.query(cls.idx == key,
+    def add_entry(cls, key, results, out_group=False):
+        return cls(parent=ndb.Key(cls, cls.get_parent_key(key)),
+                   idx=key, true_results=results, is_out_group=out_group).put()
+
+    @classmethod
+    def get_entry(cls, key, out_group=False):
+        result = cls.query(cls.idx == key, cls.is_out_group == out_group,
                            ancestor=ndb.Key(cls, cls.get_parent_key(key)))
         if int(result.count()) == 1:
             print "Read single entry from Truedict datastore!"
@@ -80,10 +86,6 @@ class Result_TrueDict(ndb.Model):
             # do something useful here
             print "Single entry not found from Truedict datastore, some error!"
         return result.get()
-
-    @classmethod
-    def add_parent(cls, key):
-        return cls(id=cls.get_parent_key(key)).put()
 
     @classmethod
     def delete_entries(cls, key):
@@ -107,6 +109,10 @@ class OriginalBiom(ndb.Model):
         return 'origbiom' + key
 
     @classmethod
+    def add_parent(cls, key):
+        return cls(id=cls.get_parent_key(key)).put()
+
+    @classmethod
     def add_entry(cls, key, biom, params_str):
         return cls(parent=ndb.Key(cls, cls.get_parent_key(key)),
                    idx=key, biom=biom, params_str=params_str).put()
@@ -122,10 +128,6 @@ class OriginalBiom(ndb.Model):
             print ('Single entry not found from OriginalBiom datastore, ' +
                    'some error!')
         return result.get()
-
-    @classmethod
-    def add_parent(cls, key):
-        return cls(id=cls.get_parent_key(key)).put()
 
     @classmethod
     def delete_entries(cls, key):
