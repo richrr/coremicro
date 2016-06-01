@@ -16,8 +16,6 @@ class ProcessData(webapp2.RequestHandler):
         otu_table_biom_o = self.request.get('otu_table_biom_key')
         mode = self.request.get('mode')
 
-        # get rid of this orig biom and use only the method
-        # also move the true results to a separate task to avoid redoing work
         user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
             g_info_list, factor, group, out_group, OUTPFILE = \
             OriginalBiom.get_params(otu_table_biom_o)
@@ -26,24 +24,6 @@ class ProcessData(webapp2.RequestHandler):
             'ndb_custom_key', 'user_args', otu_table_biom, factor, group,
             out_group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE,
             to_email)
-        # temp hack since blobstore randomly swaps file order during upload
-        if len(errors_list) > 0:
-            tmp = g_info_list
-            g_info_list = otu_table_biom
-            otu_table_biom = tmp
-            # retry with swapped files
-            indx_sampleid, indx_categ, errors_list = validate_inputs(
-                'ndb_custom_key', 'user_args', otu_table_biom, factor, group,
-                out_group, g_info_list, p_val_adj, DELIM, int(NTIMES),
-                OUTPFILE, to_email)
-            if len(errors_list) > 0:  # just give up on this
-                print '\n'.join(errors_list)
-                # put code here so that the code doesn't run further
-                sys.exit(0)
-            else:
-                print 'Swapping files worked!'
-        else:
-            print 'No file swapping needed!'
 
         if mode == 'true':
             run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
