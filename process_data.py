@@ -2,7 +2,6 @@ import webapp2
 
 from compute_core_microbiome import exec_core_microb_cmd
 
-import sys
 import random
 from utils import list_to_dict
 
@@ -75,7 +74,7 @@ def calc_significance(indx_sampleid, indx_categ, errors_list,
     categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',',
                                       'current', indx_categ, indx_sampleid)
 
-    if not check_map_file_has_two_groups(categ_samples_dict):
+    if (len(categ_samples_dict) != 2):
         errors_list.append('\nERROR: Following code divides samples in ' +
                            '>TWO groups. Change the mapping file to only '
                            'have two groups (e.g. A vs D)\n')
@@ -107,31 +106,36 @@ def shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
     '''
     get the randomized dict and run core microbiome
     '''
-
-    local_dict_frac_thresh_otus = dict()
-    rand_mapping_info_list = convert_shuffled_dict_to_str(
-        shuffled_dict, c)
+    rand_mapping_info_list = convert_shuffled_dict_to_str(shuffled_dict, c)
     rand_o_dir = str(rand_iter_numb) + OUTPFILE
     result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
                                   rand_mapping_info_list, c, group)
+    out_result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
+                                      rand_mapping_info_list, c, out_group)
 
-    # arrange the results to look pretty
-    # return the items in sorted order
+    frac_thresh = arrange_result(ndb_custom_key, result)
+    out_frac_thresh = arrange_result(ndb_custom_key, out_result)
+
+    Result_RandomDict.add_entry(ndb_custom_key, frac_thresh)
+    Result_RandomDict.add_entry(ndb_custom_key, out_frac_thresh,
+                                out_group=True)
+
+
+def arrange_result(key, result):
+    local_dict_frac_thresh_otus = dict()
     for r_frac_thresh, r_core_OTUs_biom in (
             sorted(result['frac_thresh_core_OTUs_biom'].items(),
                    key=lambda (key, value): int(key))):
         r_OTUs, r_biom = r_core_OTUs_biom
 
-        ndb_custom_key_r_frac_thres = (ndb_custom_key + '~~~~' +
-                                       r_frac_thresh)
+        ndb_custom_key_r_frac_thres = (key + '~~~~' + r_frac_thresh)
 
         if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
             print "Why do you have same fraction thresholds repeating?"
         else:
             local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = (
                 r_OTUs)
-
-    Result_RandomDict.add_entry(ndb_custom_key, local_dict_frac_thresh_otus)
+    return local_dict_frac_thresh_otus
 
 
 def convert_shuffled_dict_to_str(DICT, categ):
@@ -172,14 +176,6 @@ def get_values_from_dict(a):
     return values, lengths
 
 
-# takes iternumb which is number of random iteration and dictionary
-def check_map_file_has_two_groups(a):
-    values, lengths = get_values_from_dict(a)
-    if len(lengths) > 2:
-        return False
-    return True
-
-
 def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group,
                     out_group, mapping_info_list, p_val_adj, DELIM, NTIMES,
                     OUTPFILE, to_email):
@@ -189,14 +185,14 @@ def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group,
 
     errors_list = list()
 
-    try:  # this is from the mapping file
-        indx_sampleid = labels.index("#SampleID")
-    except ValueError:
+    if '#SampleID' in labels:
+        indx_sampleid = labels.index('#SampleID')
+    else:
         errors_list.append("' not in the headers of the sample <-> " +
                            "group info file")
-    try:
+    if c in labels:
         indx_categ = labels.index(c)
-    except ValueError:
+    else:
         errors_list.append("'%s' not in the headers of the sample <-> " +
                            "group info file" % c)
     if int(NTIMES) % 50 != 0:

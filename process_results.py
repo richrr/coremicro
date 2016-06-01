@@ -33,6 +33,7 @@ class ProcessResults(webapp2.RequestHandler):
                                                      'true_results']
             out_random = Result_RandomDict.get_entries(otu_table_biom_o,
                                                        out_group=True)
+            print 'count ' + str(out_random.count())
             out_results = process(out_true, out_random, otu_table_biom_o,
                                   numb_tasks, p_val_adj, DELIM)
             user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
@@ -55,22 +56,24 @@ class ProcessResults(webapp2.RequestHandler):
 
 def process(true, random, key, numb_tasks, p_val_adj, DELIM):
     # merge all the available dictionaries into one
-    glob_qry_entries_in_result_rand_dict = dict()
+    result_rand_dict = dict()
+    print random
     for q in random:
         q_dict = q.to_dict()
         local_dict_frac_thresh_otus = q_dict['otus']
         for ndb_custom_key_r_frac_thres, r_OTUs in (
                 local_dict_frac_thresh_otus.items()):
             if ndb_custom_key_r_frac_thres in \
-               glob_qry_entries_in_result_rand_dict:
-                glob_qry_entries_in_result_rand_dict[
+               result_rand_dict:
+                result_rand_dict[
                     ndb_custom_key_r_frac_thres].append(r_OTUs)
             else:
-                glob_qry_entries_in_result_rand_dict[
+                result_rand_dict[
                     ndb_custom_key_r_frac_thres] = [r_OTUs]
     NTIMES = int(numb_tasks)*50
-    return compile_all_results_perform_sign_calc(key, random, p_val_adj,
-                                                 DELIM, true, NTIMES)
+    return compile_all_results_perform_sign_calc(key, result_rand_dict,
+                                                 p_val_adj, DELIM, true,
+                                                 NTIMES)
 
 
 def format_results(results, p_val_adj):
