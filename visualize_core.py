@@ -166,9 +166,9 @@ if __name__ == '__main__':
     from sample_data import core, out
 
     print 'importing'
-    tree = load_gg_tree('97_otus.tree')
+    tree = load_gg_tree('tree_files/97_otus.tree')
     print 'building map'
-    mapping = build_taxonomy_code_map('97_otu_taxonomy.txt')
+    mapping = build_taxonomy_code_map('tree_files/97_otu_taxonomy.txt')
     print 'finding and marking core and out groups'
     core_nodes = annotate_group(core, tree, mapping, IN_CORE_FEATURE)
     out_nodes = annotate_group(out, tree, mapping, IN_OUT_FEATURE)

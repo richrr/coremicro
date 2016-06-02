@@ -6,17 +6,9 @@ threadsafe: true
 
 instance_class: F4_1G
 
-# this line may not be required
-includes:
-- mapreduce/include.yaml
-
 # top to bottom priority
 handlers:
 # the following mapreduce code may not be required
-- url: /mapreduce/.*
-  script: google.appengine.ext.mapreduce.main.APP
-  login: admin
-
 - url: /stylesheets
   static_dir: stylesheets
 
