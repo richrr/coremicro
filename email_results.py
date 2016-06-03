@@ -2,7 +2,8 @@ from google.appengine.api import mail
 
 
 # the user id needs to be changed to that input by the user
-def send_results_as_email(timestmp, user_args, msg, to_email):
+def send_results_as_email(timestmp, user_args, results, tree,
+                          to_email,):
     subj = "Your data from %s has been processed" % timestmp
     message = mail.EmailMessage(
         sender="Core microbiome Support <richieangel@gmail.com>",
@@ -24,5 +25,8 @@ The Core Microbiome Team
 """
     msg_str += user_args
     message.body = msg_str
-    message.attachments = ['results.tsv', msg.encode('utf-8')]
+    message.attachments = [
+        ('results.tsv', results.encode('utf-8')),
+        ('results.nh', tree.encode('utf-8'))
+    ]
     message.send()

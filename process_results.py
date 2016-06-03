@@ -9,6 +9,7 @@ from utilities import compile_results
 from email_results import send_results_as_email
 from storage import (Result_RandomDict, Result_TrueDict, OriginalBiom,
                      clean_storage)
+from make_tree import make_tree
 
 
 class ProcessResults(webapp2.RequestHandler):
@@ -38,8 +39,9 @@ class ProcessResults(webapp2.RequestHandler):
                                   numb_tasks, p_val_adj, DELIM)
             user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
             results_string = format_results(results, p_val_adj)
+            tree = make_tree(results, out_results)
             send_results_as_email(otu_table_biom_o, user_args, results_string,
-                                  to_email)
+                                  tree, to_email)
 
             clean_storage(otu_table_biom_o)
 
