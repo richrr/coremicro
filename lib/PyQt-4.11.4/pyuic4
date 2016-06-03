@@ -1,2 +1,0 @@
-#!/bin/sh
-exec pythonw2.7 /Users/nyle/work/coremicro/lib/PyQt-4-11-4/PyQt4/uic/pyuic.py ${1+"$@"}
