@@ -107,22 +107,14 @@ def compile_all_results_perform_sign_calc(ndb_custom_key,
     # core microbiome otu (checks significance)
     for frac_s in [75, 80, 85, 90, 95, 100]:
         results[frac_s] = []
-        ndb_custom_key_qury_id = ndb_custom_key + '~~~~' + str(frac_s)
 
         # this number should be equal to the number of randomizations
         # qry_entries_in_result_rand_dict is a list of list, the internal list
         # is tab-delimited OTU# and OTU name
-        qry_entries_in_result_rand_dict = \
-            glob_qry_entries_in_result_rand_dict[ndb_custom_key_qury_id]
+        taxons_ = \
+            glob_qry_entries_in_result_rand_dict[frac_s]
         print ('Number of results from randomized dict for ', frac_s,
-               '% threshold = ', len(qry_entries_in_result_rand_dict))
-
-        # compile the results from randomization
-        # this returns a list of list i.e. collects the unique set of core
-        # taxa (OTU name) from each randomized data
-        taxons_ = list()
-        for q in qry_entries_in_result_rand_dict:
-            taxons_.append(compile_results(q, DELIM))
+               '% threshold = ', len(taxons_))
 
         #  taxons_ -> sublist -> item
         all_results_otu_list = [item for sublist in taxons_

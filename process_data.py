@@ -6,18 +6,17 @@ import random
 from utils import list_to_dict
 
 from storage import Result_RandomDict, Result_TrueDict, OriginalBiom
-from utilities import compile_results
 from email_results import send_results_as_email
 
 
 class ProcessData(webapp2.RequestHandler):
     def post(self):
-        otu_table_biom_o = self.request.get('otu_table_biom_key')
+        key = self.request.get('otu_table_biom_key')
         mode = self.request.get('mode')
 
         user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
             g_info_list, factor, group, out_group, OUTPFILE = \
-            OriginalBiom.get_params(otu_table_biom_o)
+            OriginalBiom.get_params(key)
 
         indx_sampleid, indx_categ, errors_list = validate_inputs(
             'ndb_custom_key', 'user_args', otu_table_biom, factor, group,
@@ -25,40 +24,60 @@ class ProcessData(webapp2.RequestHandler):
             to_email)
 
         if mode == 'true':
-            run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
-                          group, DELIM, otu_table_biom_o)
+            res = run_data(otu_table_biom, OUTPFILE,
+                           g_info_list, factor, group)
+            Result_TrueDict.add_entry(key, res)
         elif mode == 'out':
-            run_true_data(OUTPFILE, otu_table_biom, g_info_list, factor,
-                          group, DELIM, otu_table_biom_o, out_group=True)
+            res = run_data(otu_table_biom, OUTPFILE,
+                           g_info_list, factor, out_group)
+            Result_TrueDict.add_entry(key, res, out_group=True)
         elif mode == 'random':
-            calc_significance(indx_sampleid, indx_categ, errors_list,
-                              otu_table_biom, factor, group, g_info_list,
-                              p_val_adj, DELIM, 50, OUTPFILE,
-                              to_email, otu_table_biom_o, out_group)
+            random_info_lists = calc_significance(indx_sampleid, indx_categ,
+                                                  errors_list, otu_table_biom,
+                                                  factor, group, g_info_list,
+                                                  p_val_adj, DELIM, 50,
+                                                  OUTPFILE, to_email,
+                                                  key, out_group)
+
+            for rand_list in random_info_lists:
+                Result_RandomDict.add_entry(key,
+                                            run_data(otu_table_biom, OUTPFILE,
+                                                     rand_list, factor, group))
+                Result_RandomDict.add_entry(key,
+                                            run_data(otu_table_biom, OUTPFILE,
+                                                     rand_list, factor,
+                                                     out_group),
+                                            out_group=True)
 
 
-# run core microbiome on original data
-def run_true_data(OUTPFILE, otu_table_biom, mapping_info_list, c, group, DELIM,
-                  ndb_custom_key, out_group=False):
-    o_dir = 'true_result' + OUTPFILE
+def run_data(otu_table_biom, o_dir, mapping_info_list, c, group, DELIM):
     result = exec_core_microb_cmd(otu_table_biom, o_dir, mapping_info_list,
                                   c, group)
-
     # compile original results. The key is frac_threshold,
     # value is a list of unique otus
-    true_result_frac_thresh_otus_dict = dict()
+    result_frac_thresh_otus_dict = dict()
     # return the items in sorted order
     for frac_thresh, core_OTUs_biom in (
             sorted(result['frac_thresh_core_OTUs_biom'].items(),
                    key=lambda (key, value): int(key))):
         OTUs, biom = core_OTUs_biom  # this is a tuple of otus and biom
-        true_result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs,
-                                                                         DELIM)
+        result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs,
+                                                                    DELIM)
 
-    Result_TrueDict.add_entry(ndb_custom_key,
-                              true_result_frac_thresh_otus_dict, out_group)
-    print ("Processed %s fraction thresholds for true data" %
-           str(len(true_result_frac_thresh_otus_dict)))
+    return result_frac_thresh_otus_dict
+
+
+# get unique elements from last column (otus)
+def compile_results(otus, DELIM):
+    taxon_list = list()         # this may be a json or list
+    result_ = otus              # json.loads(otus)
+    for l in result_:
+        l = l.strip()
+        contents = l.split(DELIM)
+        if '#' in l or not l:
+            continue
+        taxon_list.append(contents[1])
+    return list(set(taxon_list))
 
 
 def calc_significance(indx_sampleid, indx_categ, errors_list,
@@ -86,56 +105,12 @@ def calc_significance(indx_sampleid, indx_categ, errors_list,
         # put code here so that the code doesn't run further
 
     print "Creating shuffled dicts"
+    random_info_lists = []
     for i in range(NTIMES):
         shuffled_dict = shuffle_dicts(categ_samples_dict)
-        ndb_custom_key_entry = key + '~~~~' + str(i)
-        shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
-                                                   key,
-                                                   ndb_custom_key_entry,
-                                                   otu_table_biom, OUTPFILE, c,
-                                                   group, out_group,
-                                                   i)
-
-
-def shuffle_dict_coremic_serial_dict_datastore(shuffled_dict,
-                                               ndb_custom_key,
-                                               ndb_custom_key_entry,
-                                               otu_table_biom, OUTPFILE, c,
-                                               group, out_group,
-                                               rand_iter_numb):
-    '''
-    get the randomized dict and run core microbiome
-    '''
-    rand_mapping_info_list = convert_shuffled_dict_to_str(shuffled_dict, c)
-    rand_o_dir = str(rand_iter_numb) + OUTPFILE
-    result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
-                                  rand_mapping_info_list, c, group)
-    out_result = exec_core_microb_cmd(otu_table_biom, rand_o_dir,
-                                      rand_mapping_info_list, c, out_group)
-
-    frac_thresh = arrange_result(ndb_custom_key, result)
-    out_frac_thresh = arrange_result(ndb_custom_key, out_result)
-
-    Result_RandomDict.add_entry(ndb_custom_key, frac_thresh)
-    Result_RandomDict.add_entry(ndb_custom_key, out_frac_thresh,
-                                out_group=True)
-
-
-def arrange_result(key, result):
-    local_dict_frac_thresh_otus = dict()
-    for r_frac_thresh, r_core_OTUs_biom in (
-            sorted(result['frac_thresh_core_OTUs_biom'].items(),
-                   key=lambda (key, value): int(key))):
-        r_OTUs, r_biom = r_core_OTUs_biom
-
-        ndb_custom_key_r_frac_thres = (key + '~~~~' + r_frac_thresh)
-
-        if ndb_custom_key_r_frac_thres in local_dict_frac_thresh_otus:
-            print "Why do you have same fraction thresholds repeating?"
-        else:
-            local_dict_frac_thresh_otus[ndb_custom_key_r_frac_thres] = (
-                r_OTUs)
-    return local_dict_frac_thresh_otus
+        rand_mapping_info_list = convert_shuffled_dict_to_str(shuffled_dict, c)
+        random_info_lists.append(rand_mapping_info_list)
+    return random_info_lists
 
 
 def convert_shuffled_dict_to_str(DICT, categ):
