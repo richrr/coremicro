@@ -53,7 +53,7 @@ except ImportError:
 
 from collections import defaultdict, Counter
 
-import sqlite3
+# import sqlite3
 import math
 import tarfile
 import six
