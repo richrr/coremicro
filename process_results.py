@@ -5,7 +5,6 @@ import collections
 from google.appengine.api import taskqueue
 from google.appengine.api.taskqueue import TaskRetryOptions
 
-from utilities import compile_results
 from email_results import send_results_as_email
 from storage import (Result_RandomDict, Result_TrueDict, OriginalBiom,
                      clean_storage)
@@ -14,68 +13,60 @@ from make_tree import make_tree
 
 class ProcessResults(webapp2.RequestHandler):
     def post(self):
-        otu_table_biom_o = self.request.get("otu_table_biom_key")
+        key = self.request.get("otu_table_biom_key")
         numb_tasks = self.request.get("numb_tasks")
 
-        random = Result_RandomDict.get_entries(otu_table_biom_o)
+        random = Result_RandomDict.get_entries(key)
 
         if int(random.count()) == (int(numb_tasks)*50):
             print "Previous work completed, can move for final stage!"
             (user_args, to_email, p_val_adj, DELIM, NTIMES,
              otu_table_biom, g_info_list, factor, group, out_group,
-             OUTPFILE) = OriginalBiom.get_params(otu_table_biom_o)
+             OUTPFILE, categ_samples_dict) = OriginalBiom.get_params(
+                 key)
 
-            true = Result_TrueDict.get_entry(otu_table_biom_o).to_dict()[
-                'true_results']
-            results = process(true, random, otu_table_biom_o, numb_tasks,
-                              p_val_adj, DELIM)
-            out_true = Result_TrueDict.get_entry(otu_table_biom_o,
-                                                 out_group=True).to_dict()[
-                                                     'true_results']
-            out_random = Result_RandomDict.get_entries(otu_table_biom_o,
+            true = Result_TrueDict.get_entry(key).true_results
+            results = perform_sign_calc(key, compile_random_data(random),
+                                        p_val_adj, DELIM, true, NTIMES)
+            out_true = Result_TrueDict.get_entry(key,
+                                                 out_group=True).true_results
+            out_random = Result_RandomDict.get_entries(key,
                                                        out_group=True)
-            print 'count ' + str(out_random.count())
-            out_results = process(out_true, out_random, otu_table_biom_o,
-                                  numb_tasks, p_val_adj, DELIM)
+            out_results = perform_sign_calc(key,
+                                            compile_random_data(out_random),
+                                            p_val_adj, DELIM, out_true, NTIMES)
             user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
             results_string = format_results(results, p_val_adj)
             tree = make_tree(results, out_results)
-            send_results_as_email(otu_table_biom_o, user_args, results_string,
+            send_results_as_email(key, user_args, results_string,
                                   tree, to_email)
 
-            clean_storage(otu_table_biom_o)
+            clean_storage(key)
 
         else:
             # do something useful here
             print "Waiting for previous tasks to finish!"
             taskqueue.add(url="/process_results",
-                          params={'otu_table_biom_key': otu_table_biom_o,
+                          params={'otu_table_biom_key': key,
                                   'numb_tasks': numb_tasks},
                           retry_options=TaskRetryOptions(task_retry_limit=0,
                                                          task_age_limit=1),
                           countdown=60)
 
 
-def process(true, random, key, numb_tasks, p_val_adj, DELIM):
+def compile_random_data(random):
+    print "Compiling results"
     # merge all the available dictionaries into one
     result_rand_dict = dict()
     print random
     for q in random:
-        q_dict = q.to_dict()
-        local_dict_frac_thresh_otus = q_dict['otus']
-        for ndb_custom_key_r_frac_thres, r_OTUs in (
-                local_dict_frac_thresh_otus.items()):
-            if ndb_custom_key_r_frac_thres in \
-               result_rand_dict:
-                result_rand_dict[
-                    ndb_custom_key_r_frac_thres].append(r_OTUs)
+        local_dict_frac_thresh_otus = q.otus
+        for frac_thresh, r_OTUs in local_dict_frac_thresh_otus.items():
+            if frac_thresh in result_rand_dict:
+                result_rand_dict[frac_thresh].append(r_OTUs)
             else:
-                result_rand_dict[
-                    ndb_custom_key_r_frac_thres] = [r_OTUs]
-    NTIMES = int(numb_tasks)*50
-    return compile_all_results_perform_sign_calc(key, result_rand_dict,
-                                                 p_val_adj, DELIM, true,
-                                                 NTIMES)
+                result_rand_dict[frac_thresh] = [r_OTUs]
+    return result_rand_dict
 
 
 def format_results(results, p_val_adj):
@@ -91,34 +82,23 @@ def format_results(results, p_val_adj):
     return sign_results
 
 
-def compile_all_results_perform_sign_calc(ndb_custom_key,
-                                          glob_qry_entries_in_result_rand_dict,
-                                          p_val_adj, DELIM,
-                                          true_result_frac_thresh_otus_dict,
-                                          NTIMES):
-    '''
-    the following section compiles results from the Result Datatstore and
-    calculates stats.
-    '''
-    print "Compiling results"
+def perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict,
+                      p_val_adj, DELIM, true_result_frac_thresh_otus_dict,
+                      NTIMES):
     p_val = 0.05
     results = {}
-    # compile results; print the number of random occurances for each true
-    # core microbiome otu (checks significance)
-    for frac_s in [75, 80, 85, 90, 95, 100]:
+    for frac_s in glob_qry_entries_in_result_rand_dict.keys():
         results[frac_s] = []
 
         # this number should be equal to the number of randomizations
         # qry_entries_in_result_rand_dict is a list of list, the internal list
         # is tab-delimited OTU# and OTU name
-        taxons_ = \
-            glob_qry_entries_in_result_rand_dict[frac_s]
+        taxons = glob_qry_entries_in_result_rand_dict[frac_s]
         print ('Number of results from randomized dict for ', frac_s,
-               '% threshold = ', len(taxons_))
+               '% threshold = ', len(taxons))
 
-        #  taxons_ -> sublist -> item
-        all_results_otu_list = [item for sublist in taxons_
-                                for item in sublist]
+        #  taxons -> sublist -> item
+        all_results_otu_list = [item for sublist in taxons for item in sublist]
 
         # calculate freq of otu being a core microb from the randomizations
         # dict of otus and freq of occurance from random data

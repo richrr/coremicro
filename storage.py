@@ -153,11 +153,12 @@ class OriginalBiom(ndb.Model):
         to_email = params['to_email']
 
         otu_table_biom = q_dict['biom']
-        g_info_list = params['g_info_not_list'].split('\n')
+        group_info_list = params['group_info_list']
         user_args = (('You selected the following parameters:\n' +
                       'Factor: %s\nGroup: %s\nPval correction: %s')
                      % (factor, group, p_val_adj))
+        categ_samples_dict = params['categ_samples_dict']
 
         return (user_args, to_email, p_val_adj, DELIM, NTIMES,
-                otu_table_biom, g_info_list, factor, group, out_group,
-                OUTPFILE)
+                otu_table_biom, group_info_list, factor, group, out_group,
+                OUTPFILE, categ_samples_dict)

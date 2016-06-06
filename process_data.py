@@ -3,10 +3,8 @@ import webapp2
 from compute_core_microbiome import exec_core_microb_cmd
 
 import random
-from utils import list_to_dict
 
 from storage import Result_RandomDict, Result_TrueDict, OriginalBiom
-from email_results import send_results_as_email
 
 
 class ProcessData(webapp2.RequestHandler):
@@ -15,38 +13,29 @@ class ProcessData(webapp2.RequestHandler):
         mode = self.request.get('mode')
 
         user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
-            g_info_list, factor, group, out_group, OUTPFILE = \
-            OriginalBiom.get_params(key)
-
-        indx_sampleid, indx_categ, errors_list = validate_inputs(
-            'ndb_custom_key', 'user_args', otu_table_biom, factor, group,
-            out_group, g_info_list, p_val_adj, DELIM, int(NTIMES), OUTPFILE,
-            to_email)
+            mapping_info_list, factor, group, out_group, OUTPFILE, \
+            categ_samples_dict = OriginalBiom.get_params(key)
 
         if mode == 'true':
             res = run_data(otu_table_biom, OUTPFILE,
-                           g_info_list, factor, group)
+                           mapping_info_list, factor, group, DELIM)
             Result_TrueDict.add_entry(key, res)
         elif mode == 'out':
             res = run_data(otu_table_biom, OUTPFILE,
-                           g_info_list, factor, out_group)
+                           mapping_info_list, factor, out_group, DELIM)
             Result_TrueDict.add_entry(key, res, out_group=True)
         elif mode == 'random':
-            random_info_lists = calc_significance(indx_sampleid, indx_categ,
-                                                  errors_list, otu_table_biom,
-                                                  factor, group, g_info_list,
-                                                  p_val_adj, DELIM, 50,
-                                                  OUTPFILE, to_email,
-                                                  key, out_group)
+            random_info_lists = randomize_info(factor, 50, categ_samples_dict)
 
             for rand_list in random_info_lists:
                 Result_RandomDict.add_entry(key,
                                             run_data(otu_table_biom, OUTPFILE,
-                                                     rand_list, factor, group))
+                                                     rand_list, factor, group,
+                                                     DELIM))
                 Result_RandomDict.add_entry(key,
                                             run_data(otu_table_biom, OUTPFILE,
                                                      rand_list, factor,
-                                                     out_group),
+                                                     out_group, DELIM),
                                             out_group=True)
 
 
@@ -80,35 +69,13 @@ def compile_results(otus, DELIM):
     return list(set(taxon_list))
 
 
-def calc_significance(indx_sampleid, indx_categ, errors_list,
-                      otu_table_biom, c, group, mapping_info_list,
-                      p_val_adj, DELIM, NTIMES, OUTPFILE, to_email, key,
-                      out_group):
-
-    user_args = (('You selected the following parameters:\nFactor: %s\n' +
-                  'Group: %s\nPval correction: %s\n' +
-                  '# of randomizations: %s\n\n\n')
-                 % (c, group, p_val_adj, NTIMES))
-
-    categ_samples_dict = list_to_dict(mapping_info_list, DELIM, ',',
-                                      'current', indx_categ, indx_sampleid)
-
-    if (len(categ_samples_dict) != 2):
-        errors_list.append('\nERROR: Following code divides samples in ' +
-                           '>TWO groups. Change the mapping file to only '
-                           'have two groups (e.g. A vs D)\n')
-
-    # email the error and quit, no point to continue further
-    if len(errors_list) > 0:
-        send_results_as_email(key, user_args,
-                              '\n'.join(errors_list), to_email)
-        # put code here so that the code doesn't run further
-
+def randomize_info(factor, NTIMES, categ_samples_dict):
     print "Creating shuffled dicts"
     random_info_lists = []
     for i in range(NTIMES):
         shuffled_dict = shuffle_dicts(categ_samples_dict)
-        rand_mapping_info_list = convert_shuffled_dict_to_str(shuffled_dict, c)
+        rand_mapping_info_list = convert_shuffled_dict_to_str(shuffled_dict,
+                                                              factor)
         random_info_lists.append(rand_mapping_info_list)
     return random_info_lists
 
@@ -144,33 +111,7 @@ def divide_list(a, lengths):
 def get_values_from_dict(a):
     values = list()
     lengths = list()
-    for i in a.values():
-        v = i.split(',')
+    for v in a.values():
         values.extend(v)
         lengths.append(len(v))  # sizes of original lists
     return values, lengths
-
-
-def validate_inputs(ndb_custom_key, user_args, otu_table_biom, c, group,
-                    out_group, mapping_info_list, p_val_adj, DELIM, NTIMES,
-                    OUTPFILE, to_email):
-    # find index of SampleID and category to be summarized. e.g. swg or non-swg
-    labels = mapping_info_list[0].split(DELIM)
-    indx_sampleid = indx_categ = ''
-
-    errors_list = list()
-
-    if '#SampleID' in labels:
-        indx_sampleid = labels.index('#SampleID')
-    else:
-        errors_list.append("' not in the headers of the sample <-> " +
-                           "group info file")
-    if c in labels:
-        indx_categ = labels.index(c)
-    else:
-        errors_list.append("'%s' not in the headers of the sample <-> " +
-                           "group info file" % c)
-    if int(NTIMES) % 50 != 0:
-        errors_list.append("Number of randomizations requested is not " +
-                           "multiple of 50. Kindly rerun job")
-    return (indx_sampleid, indx_categ, errors_list)
