@@ -8,14 +8,14 @@ instance_class: F4_1G
 
 # top to bottom priority
 handlers:
-# the following mapreduce code may not be required
 - url: /stylesheets
   static_dir: stylesheets
 
 - url: /.*
   script: coremic.app
 
-
+includes:
+- lib/mapreduce/include.yaml
 
 libraries:
 - name: webapp2

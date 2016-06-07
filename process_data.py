@@ -56,6 +56,17 @@ def run_data(otu_table_biom, o_dir, mapping_info_list, c, group, DELIM):
     return result_frac_thresh_otus_dict
 
 
+def map_random_data(info):
+    core = run_data(info['data'], 'dir', info['mapping'], info['factor'],
+                    info['group'], ',')
+    out = run_data(info['data'], 'dir', info['mapping'],
+                   info['factor'], info['out_group'], ',')
+    for threshold in core:
+        yield ('core ' + str(threshold), core[threshold])
+    for threshold in out:
+        yield ('out ' + str(threshold), out[threshold])
+
+
 # get unique elements from last column (otus)
 def compile_results(otus, DELIM):
     taxon_list = list()         # this may be a json or list

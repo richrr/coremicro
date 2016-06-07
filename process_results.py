@@ -54,6 +54,27 @@ class ProcessResults(webapp2.RequestHandler):
                           countdown=60)
 
 
+def finish_analysis(key, core_random, out_random):
+    (user_args, to_email, p_val_adj, DELIM, NTIMES,
+     otu_table_biom, g_info_list, factor, group, out_group,
+     OUTPFILE, categ_samples_dict) = OriginalBiom.get_params(
+         key)
+
+    core_true = Result_TrueDict.get_entry(key).true_results
+    results = perform_sign_calc(key, core_random, p_val_adj, DELIM,
+                                core_true, NTIMES)
+    out_true = Result_TrueDict.get_entry(key, out_group=True).true_results
+    out_results = perform_sign_calc(key, out_random, p_val_adj, DELIM,
+                                    out_true, NTIMES)
+    user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
+    results_string = format_results(results, p_val_adj)
+    tree = make_tree(results, out_results)
+    send_results_as_email(key, user_args, results_string,
+                          tree, to_email)
+
+    clean_storage(key)
+
+
 def compile_random_data(random):
     print "Compiling results"
     # merge all the available dictionaries into one
@@ -67,6 +88,10 @@ def compile_random_data(random):
             else:
                 result_rand_dict[frac_thresh] = [r_OTUs]
     return result_rand_dict
+
+
+def reduce_random_data(key, values):
+    return (key, [otu for otus in values for otu in otus])
 
 
 def format_results(results, p_val_adj):
