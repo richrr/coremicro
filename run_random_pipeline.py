@@ -6,7 +6,7 @@ from mapreduce.output_writers import OutputWriter, _get_params
 
 
 from process_results import ProcessResultsPipeline, perform_sign_calc
-from storage import Result_RandomDict, Result_TrueDict, OriginalBiom
+from storage import Results, Result_TrueDict, OriginalBiom
 
 
 class RunRandomPipeline(PipelineBase):
@@ -135,13 +135,13 @@ class RandomizedDataOutputWriter(OutputWriter):
             core_true = Result_TrueDict.get_entry(self.key).true_results
             results = perform_sign_calc(self.key, compiled, p_val_adj,
                                         DELIM, core_true, NTIMES)
-            Result_RandomDict.add_entry(self.key, results)
+            Results.add_entry(self.key, results)
         elif category == 'out':
             out_true = Result_TrueDict.get_entry(self.key,
                                                  out_group=True).true_results
             results = perform_sign_calc(self.key, compiled, p_val_adj,
                                         DELIM, out_true, NTIMES)
-            Result_RandomDict.add_entry(self.key, results, out_group=True)
+            Results.add_entry(self.key, results, out_group=True)
 
     def finalize(self, ctx, shard_state):
         '''
