@@ -17,28 +17,6 @@ indexes:
     direction: desc
   - name: biom
 
-- kind: RandomDict
-  properties:
-  - name: idx
-  - name: __scatter__
-
-- kind: RandomDict
-  ancestor: yes
-  properties:
-  - name: idx
-    direction: desc
-  - name: entry_id
-    direction: desc
-  - name: dict
-
-- kind: ResultFile
-  ancestor: yes
-  properties:
-  - name: file_name
-    direction: desc
-  - name: date
-    direction: desc
-
 - kind: Result_RandomDict
   ancestor: yes
   properties:
@@ -50,3 +28,15 @@ indexes:
     direction: desc
   - name: otus
   - name: biom
+
+- kind: _AE_Pipeline_Record
+  properties:
+  - name: class_path
+  - name: start_time
+    direction: desc
+
+- kind: _AE_Pipeline_Record
+  properties:
+  - name: is_root_pipeline
+  - name: start_time
+    direction: desc

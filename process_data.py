@@ -3,8 +3,9 @@ import webapp2
 from compute_core_microbiome import exec_core_microb_cmd
 
 import random
+import json
 
-from storage import Result_RandomDict, Result_TrueDict, OriginalBiom
+from storage import Result_TrueDict, OriginalBiom
 
 
 class ProcessData(webapp2.RequestHandler):
@@ -24,19 +25,20 @@ class ProcessData(webapp2.RequestHandler):
             res = run_data(otu_table_biom, OUTPFILE,
                            mapping_info_list, factor, out_group, DELIM)
             Result_TrueDict.add_entry(key, res, out_group=True)
-        elif mode == 'random':
-            random_info_lists = randomize_info(factor, 50, categ_samples_dict)
 
-            for rand_list in random_info_lists:
-                Result_RandomDict.add_entry(key,
-                                            run_data(otu_table_biom, OUTPFILE,
-                                                     rand_list, factor, group,
-                                                     DELIM))
-                Result_RandomDict.add_entry(key,
-                                            run_data(otu_table_biom, OUTPFILE,
-                                                     rand_list, factor,
-                                                     out_group, DELIM),
-                                            out_group=True)
+
+def run_true_data(key):
+    user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
+        mapping_info_list, factor, group, out_group, OUTPFILE, \
+        categ_samples_dict = OriginalBiom.get_params(key)
+
+    Result_TrueDict.add_entry(key, run_data(otu_table_biom, OUTPFILE,
+                                            mapping_info_list, factor,
+                                            group, DELIM))
+    Result_TrueDict.add_entry(key, run_data(otu_table_biom, OUTPFILE,
+                                            mapping_info_list, factor,
+                                            out_group, DELIM),
+                              out_group=True)
 
 
 def run_data(otu_table_biom, o_dir, mapping_info_list, c, group, DELIM):
@@ -57,14 +59,17 @@ def run_data(otu_table_biom, o_dir, mapping_info_list, c, group, DELIM):
 
 
 def map_random_data(info):
-    core = run_data(info['data'], 'dir', info['mapping'], info['factor'],
-                    info['group'], ',')
-    out = run_data(info['data'], 'dir', info['mapping'],
-                   info['factor'], info['out_group'], ',')
-    for threshold in core:
-        yield ('core ' + str(threshold), core[threshold])
-    for threshold in out:
-        yield ('out ' + str(threshold), out[threshold])
+    user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
+        mapping_info_list, factor, group, out_group, OUTPFILE, \
+        categ_samples_dict = OriginalBiom.get_params(info['key'])
+    mapping = convert_shuffled_dict_to_str(shuffle_dicts(categ_samples_dict),
+                                           factor)
+    core = run_data(otu_table_biom, 'dir', mapping, factor,
+                    group, DELIM)
+    out = run_data(otu_table_biom, 'dir', mapping,
+                   factor, out_group, DELIM)
+    yield ('core', json.dumps(core))
+    yield ('out', json.dumps(out))
 
 
 # get unique elements from last column (otus)
@@ -81,7 +86,6 @@ def compile_results(otus, DELIM):
 
 
 def randomize_info(factor, NTIMES, categ_samples_dict):
-    print "Creating shuffled dicts"
     random_info_lists = []
     for i in range(NTIMES):
         shuffled_dict = shuffle_dicts(categ_samples_dict)

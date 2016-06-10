@@ -6,11 +6,10 @@ import string
 import random
 import sys
 
-from google.appengine.api import taskqueue
-from google.appengine.api.taskqueue import TaskRetryOptions
-
 from storage import init_storage
 from email_results import send_results_as_email
+from process_data import run_true_data
+from run_random_pipeline import RunRandomPipeline
 
 
 class MainPage(webapp2.RequestHandler):
@@ -70,37 +69,10 @@ class MainPage(webapp2.RequestHandler):
 
         init_storage(key, otu_table_biom, local_string_hack_dict)
 
-        numb_tasks = int(NTIMES)/50
-        # try to break the randomizations into n tasks of 50 randomizations
-        # each and then run them one by one
-        # finally run the significance calculation
-        # http://stackoverflow.com/questions/4224564/calling-a-script-after-tasks-queue-is-empty
-        taskqueue.add(url='/process_data',
-                      params={'otu_table_biom_key': key,
-                              'mode': 'true'},
-                      retry_options=TaskRetryOptions(task_retry_limit=0,
-                                                     task_age_limit=1),
-                      countdown=1)
-        taskqueue.add(url='/process_data',
-                      params={'otu_table_biom_key': key,
-                              'mode': 'out'},
-                      retry_options=TaskRetryOptions(task_retry_limit=0,
-                                                     task_age_limit=1),
-                      countdown=1)
-        for i in range(numb_tasks):
-            taskqueue.add(url="/process_data",
-                          params={'otu_table_biom_key': key,
-                                  'mode': 'random'},
-                          retry_options=TaskRetryOptions(task_retry_limit=0,
-                                                         task_age_limit=1),
-                          countdown=1)
+        run_true_data(key)
 
-        taskqueue.add(url="/process_results",
-                      params={'otu_table_biom_key': key,
-                              'numb_tasks': numb_tasks},
-                      retry_options=TaskRetryOptions(task_retry_limit=0,
-                                                     task_age_limit=1),
-                      countdown=1)
+        random_pipeline = RunRandomPipeline(key, NTIMES)
+        random_pipeline.start()
         self.redirect('/')
 
 
@@ -126,9 +98,9 @@ def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
     else:
         errors_list.append("'%s' not in the headers of the sample <-> " +
                            "group info file" % factor)
-    if int(NTIMES) % 50 != 0:
-        errors_list.append("Number of randomizations requested is not " +
-                           "multiple of 50. Kindly rerun job")
+    # if int(NTIMES) % 50 != 0:
+    #     errors_list.append("Number of randomizations requested is not " +
+    #                        "multiple of 50. Kindly rerun job")
     categ_samples_dict = get_categ_samples_dict(mapping_info_list, DELIM,
                                                 indx_categ, indx_sampleid)
     groups = categ_samples_dict.keys()

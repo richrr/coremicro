@@ -8,6 +8,10 @@ instance_class: F4_1G
 
 # top to bottom priority
 handlers:
+- url: /_ah/pipeline.*
+  script: mapreduce.lib.pipeline.handlers._APP
+  login: admin
+
 - url: /stylesheets
   static_dir: stylesheets
 

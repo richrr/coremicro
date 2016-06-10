@@ -101,6 +101,8 @@ def build_taxonomy_code_map(filename):
 
 
 def make_tree(core, out):
+    print core
+    print out
     print 'importing'
     tree = load_gg_tree('tree_files/97_otus.tree')
     print 'building map'

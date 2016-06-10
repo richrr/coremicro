@@ -8,7 +8,7 @@ def init_storage(key, biom, params_str):
     '''
     OriginalBiom.add_parent(key)
     OriginalBiom.add_entry(key, biom, params_str)
-    Result_RandomDict.add_parent(key)
+    Results.add_parent(key)
     Result_TrueDict.add_parent(key)
 
 
@@ -16,14 +16,14 @@ def clean_storage(key):
     '''
     Clean out all storage used with the specified key
     '''
-    Result_RandomDict.delete_entries(key)
+    Results.delete_entries(key)
     Result_TrueDict.delete_entries(key)
     OriginalBiom.delete_entries(key)
 
 
 # for every random dict entry, it has different thresholds
 # the actual key is automatically generated
-class Result_RandomDict(ndb.Model):
+class Results(ndb.Model):
     idx = ndb.StringProperty()  # the run id
     # the core otus from the (shuffled) dictionary as a json
     otus = ndb.JsonProperty()
@@ -43,9 +43,9 @@ class Result_RandomDict(ndb.Model):
                    idx=key, otus=results, is_out_group=out_group).put()
 
     @classmethod
-    def get_entries(cls, key, out_group=False):
+    def get_entry(cls, key, out_group=False):
         return cls.query(cls.idx == key, cls.is_out_group == out_group,
-                         ancestor=ndb.Key(cls, cls.get_parent_key(key)))
+                         ancestor=ndb.Key(cls, cls.get_parent_key(key))).get()
 
     @classmethod
     def delete_entries(cls, key):
