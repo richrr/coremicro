@@ -8,6 +8,8 @@ from mapreduce.output_writers import OutputWriter, _get_params
 from process_results import ProcessResultsPipeline, perform_sign_calc
 from storage import Results, Result_TrueDict, OriginalBiom
 
+MIN_TASKS_PER_SHARD = 50
+
 
 class RunRandomPipeline(PipelineBase):
     def run(self, key, num_to_run):
@@ -19,11 +21,12 @@ class RunRandomPipeline(PipelineBase):
             output_writer_spec='run_random_pipeline.RandomizedDataOutputWriter',
             mapper_params={
                 'key': key,
+                'num_to_run': num_to_run,
             },
             reducer_params={
                 'key': key,
             },
-            shards=num_to_run,
+            shards=int(num_to_run/MIN_TASKS_PER_SHARD),
         )
 
         yield ProcessResultsPipeline(output)
@@ -34,18 +37,18 @@ class RandomizedDataInputReader(InputReader):
     InputReader for randomized data
     '''
 
-    def __init__(self, key, done=False):
+    def __init__(self, key, to_do):
         super(RandomizedDataInputReader, self).__init__()
         self.key = key
-        self.done = done
+        self.to_do = to_do
 
     def next(self):
         '''
         Returns the next input as a dictionary
         '''
-        if self.done:
+        if self.to_do == 0:
             raise StopIteration()
-        self.done = True
+        self.to_do -= 1
         return {
             'key': self.key
         }
@@ -57,7 +60,7 @@ class RandomizedDataInputReader(InputReader):
         input_shard_state
         '''
         return cls(input_shard_state.get('key'),
-                   input_shard_state.get('done'))
+                   input_shard_state.get('to_do'))
 
     def to_json(self):
         '''
@@ -65,7 +68,7 @@ class RandomizedDataInputReader(InputReader):
         '''
         return {
             'key': self.key,
-            'done': self.done
+            'to_do': self.to_do,
         }
 
     @classmethod
@@ -75,7 +78,10 @@ class RandomizedDataInputReader(InputReader):
         '''
         key = mapper_spec.params.get('key')
         if not key:
-            raise BadReaderParamsError('Key required')
+            raise BadReaderParamsError('key required')
+        num_to_run = mapper_spec.params.get('num_to_run')
+        if not num_to_run:
+            raise BadReaderParamsError('num_to_run required')
 
     @classmethod
     def split_input(cls, mapper_spec):
@@ -84,8 +90,12 @@ class RandomizedDataInputReader(InputReader):
         mapping
         '''
         key = mapper_spec.params.get('key')
-        return [cls(key)
-                for i in range(mapper_spec.shard_count)]
+        num_to_run = mapper_spec.params.get('num_to_run')
+        shards = mapper_spec.shard_count
+        run_numbers = [int(num_to_run/shards) for i in range(shards)]
+        for i in range(num_to_run % shards):
+            run_numbers[i] += 1
+        return [cls(key, num) for num in run_numbers]
 
 
 class RandomizedDataOutputWriter(OutputWriter):
