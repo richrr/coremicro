@@ -7,7 +7,7 @@ import random
 import sys
 
 from storage import init_storage
-from email_results import send_results_as_email
+from email_results import send_error_as_email
 from process_data import run_true_data
 from run_random_pipeline import RunRandomPipeline
 
@@ -48,8 +48,8 @@ class MainPage(webapp2.RequestHandler):
                           'Pval correction: %s\n' +
                           '# of randomizations: %s\n\n\n')
                          % (factor, group, p_val_adj, NTIMES))
-            send_results_as_email(key, user_args,
-                                  '\n'.join(errors_list), to_email)
+            send_error_as_email(key, user_args, '\n'.join(errors_list),
+                                to_email)
             sys.exit(0)
 
         # make a dict and insert in ndb as a json property
@@ -91,21 +91,18 @@ def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
     if '#SampleID' in labels:
         indx_sampleid = labels.index('#SampleID')
     else:
-        errors_list.append("' not in the headers of the sample <-> " +
-                           "group info file")
+        errors_list.append('"#SampleID" not in the headers of the sample ' +
+                           '<-> group info file')
     if factor in labels:
         indx_categ = labels.index(factor)
     else:
-        errors_list.append("'%s' not in the headers of the sample <-> " +
-                           "group info file" % factor)
-    # if int(NTIMES) % 50 != 0:
-    #     errors_list.append("Number of randomizations requested is not " +
-    #                        "multiple of 50. Kindly rerun job")
+        errors_list.append('"%s" not in the headers of the sample <-> ' +
+                           'group info file' % factor)
     categ_samples_dict = get_categ_samples_dict(mapping_info_list, DELIM,
                                                 indx_categ, indx_sampleid)
     groups = categ_samples_dict.keys()
     if (len(groups) != 2):
-        errors_list.append('\nERROR: Following code divides samples ' +
+        errors_list.append('Following code divides samples ' +
                            'in >TWO groups. Change the mapping file ' +
                            'to only have two groups (e.g. A vs D)\n')
     if group not in groups:

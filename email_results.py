@@ -30,3 +30,35 @@ The Core Microbiome Team
         ('results.nh', tree.encode('utf-8'))
     ]
     message.send()
+
+
+def send_error_as_email(timestmp, user_args, error, to_email):
+    subj = 'There was an error in processing your data from %s'\
+           % timestmp
+    message = mail.EmailMessage(
+        sender="Core microbiome Support <richieangel@gmail.com>",
+        subject=subj)
+
+    # "User <richrr@vt.edu>" #Albert Johnson <Albert.Johnson@example.com>
+    email_to = 'User <' + to_email + '>'
+    message.to = email_to
+
+    msg_str = """
+Dear User:
+
+There was an error in processing your data. The error is listed below.
+
+Please email us if you have any questions.
+
+The Core Microbiome Team
+
+"""
+    msg_str += user_args
+    message.body = msg_str
+    message.attachments = [
+        ('results.tsv', results.encode('utf-8')),
+        ('results.nh', tree.encode('utf-8'))
+    ]
+    message.send()
+
+
