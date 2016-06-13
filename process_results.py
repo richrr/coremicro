@@ -1,5 +1,6 @@
 import collections
 import json
+import logging
 
 from mapreduce.base_handler import PipelineBase
 
@@ -10,7 +11,7 @@ from make_tree import make_tree
 
 class ProcessResultsPipeline(PipelineBase):
     def run(self, key):
-        print 'Processing Results'
+        logging.info('Processing Results')
         (user_args, to_email, p_val_adj, DELIM, NTIMES,
          otu_table_biom, g_info_list, factor, group, out_group,
          OUTPFILE, categ_samples_dict) = OriginalBiom.get_params(
@@ -63,8 +64,8 @@ def perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict,
         # qry_entries_in_result_rand_dict is a list of list, the internal list
         # is tab-delimited OTU# and OTU name
         taxons = glob_qry_entries_in_result_rand_dict[frac_s]
-        print 'Number of results from randomized dict for ', frac_s,\
-            '% threshold = ', len(taxons)
+        logging.info('Number of results from randomized dict for ', frac_s,
+                     '% threshold = ', len(taxons))
 
         #  taxons -> sublist -> item
         all_results_otu_list = [item for sublist in taxons for item in sublist]
@@ -89,8 +90,8 @@ def perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict,
         if len(signif_core_microb_otu_dict) == 0:
             continue            # go to next iteration
         else:
-            print 'There are %s signif core microb without corrections'\
-                % str(len(signif_core_microb_otu_dict))
+            logging.info('There are %s signif core microb without corrections'
+                         % str(len(signif_core_microb_otu_dict)))
 
         # adjust the pvalues of significant otus for multiple testing
         new_p_vals = list()

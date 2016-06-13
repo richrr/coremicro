@@ -135,7 +135,6 @@ class RandomizedDataOutputWriter(OutputWriter):
         '''
         Write data
         '''
-        print 'Writing data'
         category = data[0]
         compiled = data[1]
         (user_args, to_email, p_val_adj, DELIM, NTIMES,

@@ -1,5 +1,7 @@
 from google.appengine.ext import ndb
 
+import logging
+
 
 def init_storage(key, biom, params_str):
     '''
@@ -81,10 +83,11 @@ class Result_TrueDict(ndb.Model):
         result = cls.query(cls.idx == key, cls.is_out_group == out_group,
                            ancestor=ndb.Key(cls, cls.get_parent_key(key)))
         if int(result.count()) == 1:
-            print "Read single entry from Truedict datastore!"
+            logging.info('Read single entry from Truedict datastore!')
         else:
             # do something useful here
-            print "Single entry not found from Truedict datastore, some error!"
+            logging.warning(
+                'Single entry not found from Truedict datastore, some error!')
         return result.get()
 
     @classmethod
@@ -122,11 +125,12 @@ class OriginalBiom(ndb.Model):
         result = cls.query(cls.idx == key,
                            ancestor=ndb.Key(cls, cls.get_parent_key(key)))
         if int(result.count()) == 1:
-            print "Read single entry from OriginalBiom datastore!"
+            logging.info('Read single entry from OriginalBiom datastore!')
         else:
             # do something useful here
-            print ('Single entry not found from OriginalBiom datastore, ' +
-                   'some error!')
+            logging.warning(
+                'Single entry not found from OriginalBiom datastore, ' +
+                'some error!')
         return result.get()
 
     @classmethod
