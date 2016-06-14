@@ -1,75 +1,68 @@
-import webapp2
-
 from compute_core_microbiome import exec_core_microb_cmd
+from process_results import ProcessResultsPipeline
 
 import random
-import json
 
-from storage import Result_TrueDict, OriginalBiom
+from storage import OriginalBiom
 
-
-class ProcessData(webapp2.RequestHandler):
-    def post(self):
-        key = self.request.get('otu_table_biom_key')
-        mode = self.request.get('mode')
-
-        user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
-            mapping_info_list, factor, group, out_group, OUTPFILE, \
-            categ_samples_dict = OriginalBiom.get_params(key)
-
-        if mode == 'true':
-            res = run_data(otu_table_biom, OUTPFILE,
-                           mapping_info_list, factor, group, DELIM)
-            Result_TrueDict.add_entry(key, res)
-        elif mode == 'out':
-            res = run_data(otu_table_biom, OUTPFILE,
-                           mapping_info_list, factor, out_group, DELIM)
-            Result_TrueDict.add_entry(key, res, out_group=True)
+import pipeline
 
 
-def run_true_data(key):
-    user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
-        mapping_info_list, factor, group, out_group, OUTPFILE, \
-        categ_samples_dict = OriginalBiom.get_params(key)
+class RunPipeline(pipeline.Pipeline):
+    def run(self, key):
+        user_args, to_email, p_val_adj, DELIM, NTIMES, data, \
+            mapping, factor, group, out_group, OUTPFILE, \
+            mapping_dict = OriginalBiom.get_params(key)
 
-    Result_TrueDict.add_entry(key, run_data(otu_table_biom, OUTPFILE,
-                                            mapping_info_list, factor,
-                                            group, DELIM))
-    Result_TrueDict.add_entry(key, run_data(otu_table_biom, OUTPFILE,
-                                            mapping_info_list, factor,
-                                            out_group, DELIM),
-                              out_group=True)
+        core = yield RunDataPipeline(key, data, mapping, factor, group, DELIM)
+        out = yield RunDataPipeline(key, data, mapping, factor, out_group,
+                                    DELIM)
 
+        core_results = []
+        out_results = []
+        for i in range(int(NTIMES)):
+            randomized_mapping = convert_shuffled_dict_to_str(
+                shuffle_dicts(mapping_dict), factor)
+            core_res = yield RunDataPipeline(key, data, randomized_mapping,
+                                             factor, group, DELIM)
+            core_results.append(core_res)
+            out_res = yield RunDataPipeline(key, data, randomized_mapping,
+                                            factor, group, DELIM)
+            out_results.append(out_res)
 
-def run_data(otu_table_biom, o_dir, mapping_info_list, c, group, DELIM):
-    result = exec_core_microb_cmd(otu_table_biom, o_dir, mapping_info_list,
-                                  c, group)
-    # compile original results. The key is frac_threshold,
-    # value is a list of unique otus
-    result_frac_thresh_otus_dict = dict()
-    # return the items in sorted order
-    for frac_thresh, core_OTUs_biom in (
-            sorted(result['frac_thresh_core_OTUs_biom'].items(),
-                   key=lambda (key, value): int(key))):
-        OTUs, biom = core_OTUs_biom  # this is a tuple of otus and biom
-        result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs,
-                                                                    DELIM)
+        core_results = yield CombineResultsPipeline(*core_results)
+        out_results = yield CombineResultsPipeline(*out_results)
 
-    return result_frac_thresh_otus_dict
+        yield ProcessResultsPipeline(key, core, out, core_results, out_results)
 
 
-def map_random_data(info):
-    user_args, to_email, p_val_adj, DELIM, NTIMES, otu_table_biom, \
-        mapping_info_list, factor, group, out_group, OUTPFILE, \
-        categ_samples_dict = OriginalBiom.get_params(info['key'])
-    mapping = convert_shuffled_dict_to_str(shuffle_dicts(categ_samples_dict),
-                                           factor)
-    core = run_data(otu_table_biom, 'dir', mapping, factor,
-                    group, DELIM)
-    out = run_data(otu_table_biom, 'dir', mapping,
-                   factor, out_group, DELIM)
-    yield ('core', json.dumps(core))
-    yield ('out', json.dumps(out))
+class CombineResultsPipeline(pipeline.Pipeline):
+    def run(self, *results):
+        out = dict()
+        for res in results:
+            for threshold, otus in res.items():
+                if threshold in out:
+                    out[threshold].append(otus)
+                else:
+                    out[threshold] = otus
+        return out
+
+
+class RunDataPipeline(pipeline.Pipeline):
+    def run(self, key, data, mapping, factor, group, DELIM):
+        result = exec_core_microb_cmd(data, 'dir', mapping, factor, group)
+        # compile original results. The key is frac_threshold,
+        # value is a list of unique otus
+        result_frac_thresh_otus_dict = dict()
+        # return the items in sorted order
+        for frac_thresh, core_OTUs_biom in (
+                sorted(result['frac_thresh_core_OTUs_biom'].items(),
+                       key=lambda (key, value): int(key))):
+            OTUs, biom = core_OTUs_biom  # this is a tuple of otus and biom
+            result_frac_thresh_otus_dict[frac_thresh] = compile_results(OTUs,
+                                                                        DELIM)
+
+        return result_frac_thresh_otus_dict
 
 
 # get unique elements from last column (otus)
@@ -83,16 +76,6 @@ def compile_results(otus, DELIM):
             continue
         taxon_list.append(contents[1])
     return list(set(taxon_list))
-
-
-def randomize_info(factor, NTIMES, categ_samples_dict):
-    random_info_lists = []
-    for i in range(NTIMES):
-        shuffled_dict = shuffle_dicts(categ_samples_dict)
-        rand_mapping_info_list = convert_shuffled_dict_to_str(shuffled_dict,
-                                                              factor)
-        random_info_lists.append(rand_mapping_info_list)
-    return random_info_lists
 
 
 def convert_shuffled_dict_to_str(DICT, categ):

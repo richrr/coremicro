@@ -8,8 +8,8 @@ import sys
 
 from storage import init_storage
 from email_results import send_error_as_email
-from process_data import run_true_data
-from run_random_pipeline import RunRandomPipeline
+from process_data import RunPipeline
+# from run_random_pipeline import RunRandomPipeline
 
 
 class MainPage(webapp2.RequestHandler):
@@ -39,7 +39,7 @@ class MainPage(webapp2.RequestHandler):
         to_email = self.request.get('email')
 
         errors_list, categ_samples_dict, out_group = \
-            validate_inputs(factor, group, group_info_list, DELIM, int(NTIMES),
+            validate_inputs(factor, group, group_info_list, DELIM, NTIMES,
                             OUTPFILE)
 
         if len(errors_list) > 0:
@@ -69,10 +69,13 @@ class MainPage(webapp2.RequestHandler):
 
         init_storage(key, otu_table_biom, local_string_hack_dict)
 
-        run_true_data(key)
+        # run_true_data(key)
 
-        random_pipeline = RunRandomPipeline(key, NTIMES)
-        random_pipeline.start()
+        pipeline = RunPipeline(key)
+        pipeline.start()
+
+        # random_pipeline = RunRandomPipeline(key, NTIMES)
+        # random_pipeline.start()
         self.redirect('/')
 
 
@@ -84,7 +87,7 @@ def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
                     OUTPFILE):
     # find index of SampleID and category to be summarized. e.g. swg or non-swg
     labels = mapping_info_list[0].split(DELIM)
-    indx_sampleid = indx_categ = ''
+    indx_sampleid = indx_categ = 0
 
     errors_list = list()
 
@@ -96,8 +99,8 @@ def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
     if factor in labels:
         indx_categ = labels.index(factor)
     else:
-        errors_list.append('"%s" not in the headers of the sample <-> ' +
-                           'group info file' % factor)
+        errors_list.append(('"%s" not in the headers of the sample <-> ' +
+                            'group info file') % factor)
     categ_samples_dict = get_categ_samples_dict(mapping_info_list, DELIM,
                                                 indx_categ, indx_sampleid)
     groups = categ_samples_dict.keys()

@@ -9,17 +9,13 @@ instance_class: F4_1G
 # top to bottom priority
 handlers:
 - url: /_ah/pipeline.*
-  script: mapreduce.lib.pipeline.handlers._APP
-  login: admin
+  script: pipeline.handlers._APP
 
 - url: /stylesheets
   static_dir: stylesheets
 
 - url: /.*
   script: coremic.app
-
-includes:
-- lib/mapreduce/include.yaml
 
 libraries:
 - name: webapp2
