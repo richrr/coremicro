@@ -3,9 +3,12 @@ from process_results import ProcessResultsPipeline
 
 import random
 
-from storage import OriginalBiom
+from storage import OriginalBiom, Result_RandomDict
 
 import pipeline
+import pipeline.common
+
+MIN_TASKS_PER_PIPE = 50
 
 
 class RunPipeline(pipeline.Pipeline):
@@ -17,35 +20,41 @@ class RunPipeline(pipeline.Pipeline):
         core = yield RunDataPipeline(key, data, mapping, factor, group, DELIM)
         out = yield RunDataPipeline(key, data, mapping, factor, out_group,
                                     DELIM)
+        results = []
+        for i in range(int(int(NTIMES)/MIN_TASKS_PER_PIPE)):
+            # TODO: Don't round down to nearest 50!
+            res = yield RunRandomDataPipeline(key, data, mapping_dict,
+                                              factor, group, out_group, DELIM,
+                                              MIN_TASKS_PER_PIPE)
+            results.append(res)
+        with pipeline.InOrder():
+            yield pipeline.common.Ignore(*results)
+            yield ProcessResultsPipeline(key, core, out)
 
-        core_results = []
-        out_results = []
-        for i in range(int(NTIMES)):
+
+class RunRandomDataPipeline(pipeline.Pipeline):
+    def run(self, key, data, mapping_dict, factor, group, out_group, DELIM,
+            num):
+        processing = []
+        for i in range(num):
             randomized_mapping = convert_shuffled_dict_to_str(
                 shuffle_dicts(mapping_dict), factor)
-            core_res = yield RunDataPipeline(key, data, randomized_mapping,
-                                             factor, group, DELIM)
-            core_results.append(core_res)
-            out_res = yield RunDataPipeline(key, data, randomized_mapping,
-                                            factor, group, DELIM)
-            out_results.append(out_res)
+            core = yield RunDataPipeline(key, data, randomized_mapping,
+                                         factor, group, DELIM)
+            core_write = yield WriteRandomResults(key, core,
+                                                  out_group=False)
+            processing.append(core_write)
+            out = yield RunDataPipeline(key, data, randomized_mapping,
+                                        factor, out_group, DELIM)
+            out_write = yield WriteRandomResults(key, out, out_group=True)
+            processing.append(out_write)
+        # Wait till everything is done
+        yield pipeline.common.Ignore(*processing)
 
-        core_results = yield CombineResultsPipeline(*core_results)
-        out_results = yield CombineResultsPipeline(*out_results)
 
-        yield ProcessResultsPipeline(key, core, out, core_results, out_results)
-
-
-class CombineResultsPipeline(pipeline.Pipeline):
-    def run(self, *results):
-        out = dict()
-        for res in results:
-            for threshold, otus in res.items():
-                if threshold in out:
-                    out[threshold].append(otus)
-                else:
-                    out[threshold] = otus
-        return out
+class WriteRandomResults(pipeline.Pipeline):
+    def run(self, key, results, out_group=False):
+        return Result_RandomDict.add_entry(key, results, out_group)
 
 
 class RunDataPipeline(pipeline.Pipeline):

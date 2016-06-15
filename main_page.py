@@ -86,15 +86,15 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
 def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
                     OUTPFILE):
     # find index of SampleID and category to be summarized. e.g. swg or non-swg
-    labels = mapping_info_list[0].split(DELIM)
+    labels = mapping_info_list[0].strip().strip('#').split(DELIM)
     indx_sampleid = indx_categ = 0
 
     errors_list = list()
 
-    if '#SampleID' in labels:
-        indx_sampleid = labels.index('#SampleID')
+    if 'SampleID' in labels:
+        indx_sampleid = labels.index('SampleID')
     else:
-        errors_list.append('"#SampleID" not in the headers of the sample ' +
+        errors_list.append('"SampleID" not in the headers of the sample ' +
                            '<-> group info file')
     if factor in labels:
         indx_categ = labels.index(factor)

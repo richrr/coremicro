@@ -5,28 +5,42 @@ import logging
 from mapreduce.base_handler import PipelineBase
 
 from email_results import send_results_as_email
-from storage import OriginalBiom, clean_storage
+from storage import OriginalBiom, clean_storage, Result_RandomDict
 from make_tree import make_tree
 
 
 class ProcessResultsPipeline(PipelineBase):
-    def run(self, key, core, out, core_res, out_res):
+    def run(self, key, core, out):
         logging.info('Processing Results')
         (user_args, to_email, p_val_adj, DELIM, NTIMES,
          otu_table_biom, g_info_list, factor, group, out_group,
          OUTPFILE, categ_samples_dict) = OriginalBiom.get_params(
              key)
-        results = perform_sign_calc(key, core_res, p_val_adj, DELIM, core,
+        core_rand = combine_results(
+            Result_RandomDict.get_entries(key, out_group=False))
+        out_rand = combine_results(
+            Result_RandomDict.get_entries(key, out_group=True))
+        core_res = perform_sign_calc(key, core_rand, p_val_adj, DELIM, core,
+                                     NTIMES)
+        out_res = perform_sign_calc(key, out_rand, p_val_adj, DELIM, out,
                                     NTIMES)
-        out_results = perform_sign_calc(key, out_res, p_val_adj, DELIM, out,
-                                        NTIMES)
-        tree = make_tree(results, out_results)
+        tree = make_tree(core_res, out_res)
         user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
-        results_string = format_results(results, p_val_adj)
-        send_results_as_email(key, user_args, results_string,
-                              tree, to_email)
+        results_string = format_results(core_res, p_val_adj)
+        send_results_as_email(key, user_args, results_string, tree, to_email)
 
         clean_storage(key)
+
+
+def combine_results(results):
+    output = dict()
+    for res in results:
+        for threshold, otus in res.otus.items():
+            if threshold in output:
+                output[threshold].append(otus)
+            else:
+                output[threshold] = otus
+    return output
 
 
 def reduce_random_data(key, values):
