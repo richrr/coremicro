@@ -152,15 +152,17 @@ class OriginalBiom(ndb.Model):
         out_group = params['out_group']
         p_val_adj = params['p_val_adj']
         DELIM = params['delim']
-        NTIMES = params['ntimes']
+        NTIMES = int(params['ntimes'])
         OUTPFILE = params['outpfile']
         to_email = params['to_email']
 
         otu_table_biom = q_dict['biom']
         group_info_list = params['group_info_list']
-        user_args = (('You selected the following parameters:\n' +
-                      'Factor: %s\nGroup: %s\nPval correction: %s')
-                     % (factor, group, p_val_adj))
+        user_args = (('You selected the following parameters:' +
+                      '\nFactor: %s\nGroup: %s\n' +
+                      'Pval correction: %s\n' +
+                      '# of randomizations: %d\n\n\n')
+                     % (factor, group, p_val_adj, NTIMES))
         categ_samples_dict = params['categ_samples_dict']
 
         return (user_args, to_email, p_val_adj, DELIM, NTIMES,

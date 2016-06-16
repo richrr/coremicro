@@ -57,5 +57,6 @@ The Core Microbiome Team
 
 """
     msg_str += user_args
+    msg_str += '\n' + error
     message.body = msg_str
     message.send()

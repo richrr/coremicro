@@ -50,6 +50,7 @@ class MainPage(webapp2.RequestHandler):
                          % (factor, group, p_val_adj, NTIMES))
             send_error_as_email(key, user_args, '\n'.join(errors_list),
                                 to_email)
+            # TODO: Return form with error marked
             sys.exit(0)
 
         # make a dict and insert in ndb as a json property

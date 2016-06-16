@@ -4,8 +4,7 @@ import logging
 
 from mapreduce.base_handler import PipelineBase
 
-from email_results import send_results_as_email
-from storage import OriginalBiom, clean_storage, Result_RandomDict
+from storage import OriginalBiom, Result_RandomDict
 from make_tree import make_tree
 
 
@@ -25,11 +24,8 @@ class ProcessResultsPipeline(PipelineBase):
         out_res = perform_sign_calc(key, out_rand, p_val_adj, DELIM, out,
                                     NTIMES)
         tree = make_tree(core_res, out_res)
-        user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
         results_string = format_results(core_res, p_val_adj)
-        send_results_as_email(key, user_args, results_string, tree, to_email)
-
-        clean_storage(key)
+        return [results_string, tree]
 
 
 def combine_results(results):
