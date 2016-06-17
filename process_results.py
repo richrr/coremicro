@@ -4,27 +4,39 @@ import logging
 
 from mapreduce.base_handler import PipelineBase
 
-from email_results import send_results_as_email
-from storage import Results,  OriginalBiom, clean_storage
+from storage import OriginalBiom, Result_RandomDict
 from make_tree import make_tree
 
 
 class ProcessResultsPipeline(PipelineBase):
-    def run(self, key):
+    def run(self, key, core, out):
         logging.info('Processing Results')
         (user_args, to_email, p_val_adj, DELIM, NTIMES,
          otu_table_biom, g_info_list, factor, group, out_group,
          OUTPFILE, categ_samples_dict) = OriginalBiom.get_params(
              key)
-        results = Results.get_entry(key).otus
-        out_results = Results.get_entry(key, out_group=True).otus
-        user_args += '\n# of randomizations: ' + str(NTIMES) + '\n\n\n'
-        results_string = format_results(results, p_val_adj)
-        tree = make_tree(results, out_results)
-        send_results_as_email(key, user_args, results_string,
-                              tree, to_email)
+        core_rand = combine_results(
+            Result_RandomDict.get_entries(key, out_group=False))
+        out_rand = combine_results(
+            Result_RandomDict.get_entries(key, out_group=True))
+        core_res = perform_sign_calc(key, core_rand, p_val_adj, DELIM, core,
+                                     NTIMES)
+        out_res = perform_sign_calc(key, out_rand, p_val_adj, DELIM, out,
+                                    NTIMES)
+        tree = make_tree(core_res, out_res)
+        results_string = format_results(core_res, p_val_adj)
+        return [results_string, tree]
 
-        clean_storage(key)
+
+def combine_results(results):
+    output = dict()
+    for res in results:
+        for threshold, otus in res.otus.items():
+            if threshold in output:
+                output[threshold].append(otus)
+            else:
+                output[threshold] = otus
+    return output
 
 
 def reduce_random_data(key, values):
@@ -64,8 +76,9 @@ def perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict,
         # qry_entries_in_result_rand_dict is a list of list, the internal list
         # is tab-delimited OTU# and OTU name
         taxons = glob_qry_entries_in_result_rand_dict[frac_s]
-        logging.info('Number of results from randomized dict for ', frac_s,
-                     '% threshold = ', len(taxons))
+        logging.info('Number of results from randomized dict for %s%% ' +
+                     'threshold = %d',
+                     frac_s, len(taxons))
 
         #  taxons -> sublist -> item
         all_results_otu_list = [item for sublist in taxons for item in sublist]

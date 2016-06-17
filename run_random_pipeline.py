@@ -11,25 +11,25 @@ from storage import Results, Result_TrueDict, OriginalBiom
 MIN_TASKS_PER_SHARD = 50
 
 
-class RunRandomPipeline(PipelineBase):
-    def run(self, key, num_to_run):
-        output = yield mapreduce_pipeline.MapreducePipeline(
-            'run_random',
-            mapper_spec='process_data.map_random_data',
-            reducer_spec='process_results.reduce_random_data',
-            input_reader_spec='run_random_pipeline.RandomizedDataInputReader',
-            output_writer_spec='run_random_pipeline.RandomizedDataOutputWriter',
-            mapper_params={
-                'key': key,
-                'num_to_run': num_to_run,
-            },
-            reducer_params={
-                'key': key,
-            },
-            shards=int(num_to_run/MIN_TASKS_PER_SHARD),
-        )
+# class RunRandomPipeline(PipelineBase):
+#     def run(self, key, num_to_run):
+#         output = yield mapreduce_pipeline.MapreducePipeline(
+#             'run_random',
+#             mapper_spec='process_data.map_random_data',
+#             reducer_spec='process_results.reduce_random_data',
+#             input_reader_spec='run_random_pipeline.RandomizedDataInputReader',
+#             output_writer_spec='run_random_pipeline.RandomizedDataOutputWriter',
+#             mapper_params={
+#                 'key': key,
+#                 'num_to_run': num_to_run,
+#             },
+#             reducer_params={
+#                 'key': key,
+#             },
+#             shards=int(num_to_run/MIN_TASKS_PER_SHARD),
+#         )
 
-        yield ProcessResultsPipeline(output)
+#         yield ProcessResultsPipeline(output)
 
 
 class RandomizedDataInputReader(InputReader):

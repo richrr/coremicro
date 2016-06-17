@@ -110,6 +110,6 @@ def make_tree(core, out):
     core_nodes = annotate_group(core, tree, mapping, IN_CORE_FEATURE)
     out_nodes = annotate_group(out, tree, mapping, IN_OUT_FEATURE)
     logging.info('pruning')
-    tree.prune(core_nodes + out_nodes)
+    # tree.prune(core_nodes + out_nodes)
 
     return tree.write(features=[], format=0)

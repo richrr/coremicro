@@ -1,5 +1,7 @@
 from google.appengine.api import mail
 
+import logging
+
 
 # the user id needs to be changed to that input by the user
 def send_results_as_email(timestmp, user_args, results, tree,
@@ -33,6 +35,7 @@ The Core Microbiome Team
 
 
 def send_error_as_email(timestmp, user_args, error, to_email):
+    logging.warn(error)
     subj = 'There was an error in processing your data from %s'\
            % timestmp
     message = mail.EmailMessage(
@@ -54,11 +57,6 @@ The Core Microbiome Team
 
 """
     msg_str += user_args
+    msg_str += '\n' + error
     message.body = msg_str
-    message.attachments = [
-        ('results.tsv', results.encode('utf-8')),
-        ('results.nh', tree.encode('utf-8'))
-    ]
     message.send()
-
-

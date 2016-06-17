@@ -4,22 +4,20 @@ runtime: python27
 api_version: 1
 threadsafe: true
 
-instance_class: F4_1G
+instance_class: F4
+automatic_scaling:
+  max_idle_instances: 1
+  min_idle_instances: 0
 
-# top to bottom priority
 handlers:
 - url: /_ah/pipeline.*
-  script: mapreduce.lib.pipeline.handlers._APP
-  login: admin
+  script: pipeline.handlers._APP
 
 - url: /stylesheets
   static_dir: stylesheets
 
 - url: /.*
   script: coremic.app
-
-includes:
-- lib/mapreduce/include.yaml
 
 libraries:
 - name: webapp2
