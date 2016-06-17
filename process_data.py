@@ -3,7 +3,7 @@ from process_results import ProcessResultsPipeline
 
 import random
 
-from storage import OriginalBiom, Result_RandomDict, clean_storage
+from storage import Result_RandomDict, clean_storage
 from email_results import send_error_as_email, send_results_as_email
 
 import pipeline
@@ -14,13 +14,18 @@ MAX_NUM_PARALLEL = 50
 
 
 class RunPipeline(pipeline.Pipeline):
-    def run(self, key):
-        user_args, to_email, p_val_adj, DELIM, NTIMES, data, \
-            mapping, factor, group, out_group, OUTPFILE, \
-            mapping_dict = OriginalBiom.get_params(key)
+    def run(self, params):
+        data = params['data']
+        mapping_file = params['mapping_file']
+        mapping_dict = params['mapping_dict']
+        factor = params['factor']
+        group = params['group']
+        out_group = params['out_group']
+        DELIM = params['delim']
+        NTIMES = int(params['ntimes'])
 
-        core = yield RunDataPipeline(key, data, mapping, factor, group, DELIM)
-        out = yield RunDataPipeline(key, data, mapping, factor, out_group,
+        core = yield RunDataPipeline(data, mapping_file, factor, group, DELIM)
+        out = yield RunDataPipeline(data, mapping_file, factor, out_group,
                                     DELIM)
         processing = []
         if NTIMES <= MAX_NUM_PARALLEL:
@@ -32,35 +37,34 @@ class RunPipeline(pipeline.Pipeline):
             for i in range(left_over):
                 pipes[i] += 1
         for num_in_task in pipes:
-            res = yield RunRandomDataPipeline(key, data, mapping_dict,
+            res = yield RunRandomDataPipeline(data, mapping_dict,
                                               factor, group, out_group, DELIM,
                                               num_in_task)
             processing.append(res)
         with pipeline.InOrder():
             yield pipeline.common.Ignore(*processing)
-            yield ProcessResultsPipeline(key, core, out)
-        # yield pipeline.common.Return(results)
+            yield ProcessResultsPipeline(params, core, out)
 
     def finalized(self):
-        key = self.args[0]
-        user_args, to_email, p_val_adj, DELIM, NTIMES, data, \
-            mapping, factor, group, out_group, OUTPFILE, \
-            mapping_dict = OriginalBiom.get_params(key)
-        if self.was_aborted:
+        params = self.args[0]
+        timestamp = params['timestamp']
+        user_args = params['user_args']
+        to_email = params['to_email']
 
+        if self.was_aborted:
             error = 'An unknown error has occured. Please try again. ' +\
                     'If this occurs again please contact the developers'
-            send_error_as_email(key, user_args, error, to_email)
+            send_error_as_email(timestamp, user_args, error, to_email)
         else:
             results_string = self.outputs.default.value[0]
             tree = self.outputs.default.value[1]
-            send_results_as_email(key, user_args, results_string, tree,
+            send_results_as_email(timestamp, user_args, results_string, tree,
                                   to_email)
-        clean_storage(self.args[0])
+        clean_storage(self.root_pipeline_id)
 
 
 class RunRandomDataPipeline(pipeline.Pipeline):
-    def run(self, key, data, mapping_dict, factor, group, out_group, DELIM,
+    def run(self, data, mapping_dict, factor, group, out_group, DELIM,
             num):
         processing = []
         # To prevent spawning too many tasks at one time
@@ -68,15 +72,17 @@ class RunRandomDataPipeline(pipeline.Pipeline):
             for i in range(num):
                 randomized_mapping = convert_shuffled_dict_to_str(
                     shuffle_dicts(mapping_dict), factor)
-                core = yield RunDataPipeline(key, data, randomized_mapping,
+                core = yield RunDataPipeline(data, randomized_mapping,
                                              factor, group, DELIM)
-                core_write = yield WriteRandomResultPipeline(key, core,
+                core_write = yield WriteRandomResultPipeline(self.pipeline_id,
+                                                             core,
                                                              out_group=False)
                 processing.append(core_write)
-                out = yield RunDataPipeline(key, data, randomized_mapping,
+                out = yield RunDataPipeline(data, randomized_mapping,
                                             factor, out_group, DELIM,
                                             out_group=True)
-                out_write = yield WriteRandomResultPipeline(key, out,
+                out_write = yield WriteRandomResultPipeline(self.pipeline_id,
+                                                            out,
                                                             out_group=True)
                 processing.append(out_write)
             # Wait till everything is done
@@ -84,7 +90,7 @@ class RunRandomDataPipeline(pipeline.Pipeline):
 
 
 class RunDataPipeline(pipeline.Pipeline):
-    def run(self, key, data, mapping, factor, group, DELIM, out_group=False):
+    def run(self, data, mapping, factor, group, DELIM, out_group=False):
         result = exec_core_microb_cmd(data, 'dir', mapping, factor, group)
         # compile original results. The key is frac_threshold,
         # value is a list of unique otus
@@ -100,8 +106,9 @@ class RunDataPipeline(pipeline.Pipeline):
 
 
 class WriteRandomResultPipeline(pipeline.Pipeline):
-    def run(self, key, result, out_group=False):
-        return Result_RandomDict.add_entry(key, result, out_group)
+    def run(self, run_id, result, out_group=False):
+        return Result_RandomDict.add_entry(self.root_pipeline_id,
+                                           run_id, result, out_group)
 
 
 # get unique elements from last column (otus)

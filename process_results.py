@@ -1,27 +1,22 @@
 import collections
-import json
 import logging
 
 from mapreduce.base_handler import PipelineBase
 
-from storage import OriginalBiom, Result_RandomDict
+from storage import Result_RandomDict
 from make_tree import make_tree
 
 
 class ProcessResultsPipeline(PipelineBase):
-    def run(self, key, core, out):
-        logging.info('Processing Results')
-        (user_args, to_email, p_val_adj, DELIM, NTIMES,
-         otu_table_biom, g_info_list, factor, group, out_group,
-         OUTPFILE, categ_samples_dict) = OriginalBiom.get_params(
-             key)
-        core_rand = combine_results(
-            Result_RandomDict.get_entries(key, out_group=False))
-        out_rand = combine_results(
-            Result_RandomDict.get_entries(key, out_group=True))
-        core_res = perform_sign_calc(key, core_rand, p_val_adj, DELIM, core,
+    def run(self, params, core, out):
+        p_val_adj = params['p_val_adj']
+        DELIM = params['delim']
+        NTIMES = params['ntimes']
+        core_rand, out_rand = combine_results(
+            Result_RandomDict.get_entries(self.root_pipeline_id))
+        core_res = perform_sign_calc(core_rand, p_val_adj, DELIM, core,
                                      NTIMES)
-        out_res = perform_sign_calc(key, out_rand, p_val_adj, DELIM, out,
+        out_res = perform_sign_calc(out_rand, p_val_adj, DELIM, out,
                                     NTIMES)
         tree = make_tree(core_res, out_res)
         results_string = format_results(core_res, p_val_adj)
@@ -29,26 +24,22 @@ class ProcessResultsPipeline(PipelineBase):
 
 
 def combine_results(results):
-    output = dict()
+    core = dict()
+    out = dict()
     for res in results:
-        for threshold, otus in res.otus.items():
-            if threshold in output:
-                output[threshold].append(otus)
+        res_core = res.core
+        for threshold, otus in res_core.otus.items():
+            if threshold in core:
+                core[threshold].append(otus)
             else:
-                output[threshold] = otus
-    return output
-
-
-def reduce_random_data(key, values):
-    random = map(json.loads, values)
-    result_rand_dict = dict()
-    for q in random:
-        for frac_thresh, r_OTUs in q.items():
-            if frac_thresh in result_rand_dict:
-                result_rand_dict[frac_thresh].append(r_OTUs)
+                core[threshold] = otus
+        res_out = res.out
+        for threshold, otus in res_out.otus.items():
+            if threshold in out:
+                out[threshold].append(otus)
             else:
-                result_rand_dict[frac_thresh] = r_OTUs
-    yield (key, result_rand_dict)
+                out[threshold] = otus
+    return core, out
 
 
 def format_results(results, p_val_adj):
@@ -64,7 +55,7 @@ def format_results(results, p_val_adj):
     return sign_results
 
 
-def perform_sign_calc(ndb_custom_key, glob_qry_entries_in_result_rand_dict,
+def perform_sign_calc(glob_qry_entries_in_result_rand_dict,
                       p_val_adj, DELIM, true_result_frac_thresh_otus_dict,
                       NTIMES):
     p_val = 0.05

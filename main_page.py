@@ -2,14 +2,10 @@ import webapp2
 
 from time import localtime, strftime
 
-import string
-import random
 import sys
 
-from storage import init_storage
 from email_results import send_error_as_email
 from process_data import RunPipeline
-# from run_random_pipeline import RunRandomPipeline
 
 
 class MainPage(webapp2.RequestHandler):
@@ -21,73 +17,61 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(MAIN_PAGE_HTML.format(upload_url))
 
     def post(self):
-        otu_table_biom = self.request.get('datafile')
-        group_info_list = self.request.get('groupfile').split('\n')
+        data = self.request.get('datafile')
+        mapping_file = self.request.get('groupfile').split('\n')
 
         DELIM = '\t'
         factor, group = self.request.get('group').split(':')
         NTIMES = int(self.request.get('random'))
-        datetime = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
-
-        # added a random alpha numeric to avoid conflict with another
-        # (simultaneous) user request.
-        OUTPFILE = self.request.get('content') + datetime + id_generator()
-        key = OUTPFILE + '~~~~' + factor + '~~~~' + group
+        timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
 
         p_val_adj = self.request.get('pvaladjmethod')
 
         to_email = self.request.get('email')
 
-        errors_list, categ_samples_dict, out_group = \
-            validate_inputs(factor, group, group_info_list, DELIM, NTIMES,
-                            OUTPFILE)
+        user_args = (('You selected the following parameters:' +
+                      '\nFactor: %s\nGroup: %s\n' +
+                      'Pval correction: %s\n' +
+                      '# of randomizations: %s\n\n\n')
+                     % (factor, group, p_val_adj, NTIMES))
+
+        params = {
+            'mapping_file': mapping_file,
+            'factor': factor,
+            'group': group,
+            'p_val_adj': p_val_adj,
+            'delim': DELIM,
+            'ntimes': str(NTIMES),
+            'to_email': to_email,
+            'data': data,
+            'timestamp': timestamp,
+            'user_args': user_args,
+        }
+
+        errors_list, mapping_dict, out_group = validate_inputs(params)
+
+        params['out_group'] = out_group
+        params['mapping_dict'] = mapping_dict
 
         if len(errors_list) > 0:
-            user_args = (('You selected the following parameters:' +
-                          '\nFactor: %s\nGroup: %s\n' +
-                          'Pval correction: %s\n' +
-                          '# of randomizations: %s\n\n\n')
-                         % (factor, group, p_val_adj, NTIMES))
-            send_error_as_email(key, user_args, '\n'.join(errors_list),
+            send_error_as_email(timestamp, user_args, '\n'.join(errors_list),
                                 to_email)
             # TODO: Return form with error marked
             sys.exit(0)
 
-        # make a dict and insert in ndb as a json property
-        local_string_hack_dict = {
-            'otu_table_biom_key': key,
-            'group_info_list': group_info_list,
-            'factor': factor,
-            'group': group,
-            'out_group': out_group,
-            'p_val_adj': p_val_adj,
-            'delim': DELIM,
-            'ntimes': str(NTIMES),
-            'outpfile': OUTPFILE,
-            'to_email': to_email,
-            'categ_samples_dict': categ_samples_dict,
-        }
-
-        init_storage(key, otu_table_biom, local_string_hack_dict)
-
-        # run_true_data(key)
-
-        pipeline = RunPipeline(key)
+        pipeline = RunPipeline(params)
         pipeline.start()
 
-        # random_pipeline = RunRandomPipeline(key, NTIMES)
-        # random_pipeline.start()
         self.redirect('/')
 
 
-def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
-    return ''.join(random.choice(chars) for _ in range(size))
+def validate_inputs(params):
+    mapping_file = params['mapping_file']
+    DELIM = params['delim']
+    factor = params['factor']
+    group = params['group']
 
-
-def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
-                    OUTPFILE):
-    # find index of SampleID and category to be summarized. e.g. swg or non-swg
-    labels = mapping_info_list[0].strip().strip('#').split(DELIM)
+    labels = mapping_file[0].strip().strip('#').split(DELIM)
     indx_sampleid = indx_categ = 0
 
     errors_list = list()
@@ -102,9 +86,9 @@ def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
     else:
         errors_list.append(('"%s" not in the headers of the sample <-> ' +
                             'group info file') % factor)
-    categ_samples_dict = get_categ_samples_dict(mapping_info_list, DELIM,
-                                                indx_categ, indx_sampleid)
-    groups = categ_samples_dict.keys()
+    mapping_dict = get_categ_samples_dict(mapping_file, DELIM,
+                                          indx_categ, indx_sampleid)
+    groups = mapping_dict.keys()
     if (len(groups) != 2):
         errors_list.append('Following code divides samples ' +
                            'in >TWO groups. Change the mapping file ' +
@@ -115,7 +99,7 @@ def validate_inputs(factor, group, mapping_info_list, DELIM, NTIMES,
     else:
         groups.remove(group)
         out_group = groups[0]
-    return (errors_list, categ_samples_dict, out_group)
+    return (errors_list, mapping_dict, out_group)
 
 
 def get_categ_samples_dict(mapping_info_list, DELIM, index_categ,
