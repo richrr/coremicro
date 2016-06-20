@@ -74,17 +74,12 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                     shuffle_dicts(mapping_dict), factor)
                 core = yield RunDataPipeline(data, randomized_mapping,
                                              factor, group, DELIM)
-                core_write = yield WriteRandomResultPipeline(self.pipeline_id,
-                                                             core,
-                                                             out_group=False)
-                processing.append(core_write)
                 out = yield RunDataPipeline(data, randomized_mapping,
                                             factor, out_group, DELIM,
                                             out_group=True)
-                out_write = yield WriteRandomResultPipeline(self.pipeline_id,
-                                                            out,
-                                                            out_group=True)
-                processing.append(out_write)
+                write = yield WriteRandomResultPipeline(self.pipeline_id,
+                                                        core, out)
+                processing.append(write)
             # Wait till everything is done
         yield pipeline.common.Ignore(*processing)
 
@@ -106,9 +101,9 @@ class RunDataPipeline(pipeline.Pipeline):
 
 
 class WriteRandomResultPipeline(pipeline.Pipeline):
-    def run(self, run_id, result, out_group=False):
+    def run(self, run_id, core, out):
         return Result_RandomDict.add_entry(self.root_pipeline_id,
-                                           run_id, result, out_group)
+                                           run_id, core, out)
 
 
 # get unique elements from last column (otus)

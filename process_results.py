@@ -28,13 +28,13 @@ def combine_results(results):
     out = dict()
     for res in results:
         res_core = res.core
-        for threshold, otus in res_core.otus.items():
+        for threshold, otus in res_core.items():
             if threshold in core:
                 core[threshold].append(otus)
             else:
                 core[threshold] = otus
         res_out = res.out
-        for threshold, otus in res_out.otus.items():
+        for threshold, otus in res_out.items():
             if threshold in out:
                 out[threshold].append(otus)
             else:
