@@ -9,13 +9,16 @@ from make_tree import make_tree
 
 class ProcessResultsPipeline(PipelineBase):
     def run(self, params, core, out):
+        logging.info('Processing results')
         p_val_adj = params['p_val_adj']
         DELIM = params['delim']
         NTIMES = params['ntimes']
-        core_rand, out_rand = combine_results(
-            Result_RandomDict.get_entries(self.root_pipeline_id))
+        rand_res = Result_RandomDict.get_entries(self.root_pipeline_id)
+        core_rand, out_rand = combine_results(rand_res)
+        logging.info('Processing core data')
         core_res = perform_sign_calc(core_rand, p_val_adj, DELIM, core,
                                      NTIMES)
+        logging.info('Processing out-group data')
         out_res = perform_sign_calc(out_rand, p_val_adj, DELIM, out,
                                     NTIMES)
         tree = make_tree(core_res, out_res)
@@ -30,15 +33,15 @@ def combine_results(results):
         res_core = res.core
         for threshold, otus in res_core.items():
             if threshold in core:
-                core[threshold].append(otus)
+                core[threshold].update(otus)
             else:
-                core[threshold] = otus
+                core[threshold] = collections.Counter(otus)
         res_out = res.out
         for threshold, otus in res_out.items():
             if threshold in out:
-                out[threshold].append(otus)
+                out[threshold].update(otus)
             else:
-                out[threshold] = otus
+                out[threshold] = collections.Counter(otus)
     return core, out
 
 
@@ -60,23 +63,15 @@ def perform_sign_calc(glob_qry_entries_in_result_rand_dict,
                       NTIMES):
     p_val = 0.05
     results = {}
+    logging.info('Performing significance calculations')
+    logging.info('%d thresholds present in randomized data',
+                 len(glob_qry_entries_in_result_rand_dict))
     for frac_s in glob_qry_entries_in_result_rand_dict.keys():
         results[frac_s] = []
-
-        # this number should be equal to the number of randomizations
-        # qry_entries_in_result_rand_dict is a list of list, the internal list
-        # is tab-delimited OTU# and OTU name
-        taxons = glob_qry_entries_in_result_rand_dict[frac_s]
-        logging.info('Number of results from randomized dict for %s%% ' +
+        randomized_otus = glob_qry_entries_in_result_rand_dict[frac_s]
+        logging.info('Number of OTUs from randomized dict for %s%% ' +
                      'threshold = %d',
-                     frac_s, len(taxons))
-
-        #  taxons -> sublist -> item
-        all_results_otu_list = [item for sublist in taxons for item in sublist]
-
-        # calculate freq of otu being a core microb from the randomizations
-        # dict of otus and freq of occurance from random data
-        randomized_otus = collections.Counter(all_results_otu_list)
+                     frac_s, len(randomized_otus))
 
         # check significance
         signif_core_microb_otu_dict = collections.OrderedDict()
