@@ -16,8 +16,8 @@ handlers:
 - url: /_ah/pipeline.*
   script: pipeline.handlers._APP
 
-- url: /stylesheets
-  static_dir: stylesheets
+- url: /static
+  static_dir: static
 
 - url: /.*
   script: coremic.app
