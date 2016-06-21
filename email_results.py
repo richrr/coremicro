@@ -1,20 +1,12 @@
 from google.appengine.api import mail
+from google.appengine.api.app_identity import get_application_id
 
 import logging
 
 
-# the user id needs to be changed to that input by the user
 def send_results_as_email(timestmp, user_args, results, tree,
                           to_email,):
     subj = "Your data from %s has been processed" % timestmp
-    message = mail.EmailMessage(
-        sender="Core microbiome Support <richieangel@gmail.com>",
-        subject=subj)
-
-    # "User <richrr@vt.edu>" #Albert Johnson <Albert.Johnson@example.com>
-    email_to = 'User <' + to_email + '>'
-    message.to = email_to
-
     msg_str = """
 Dear User:
 
@@ -26,6 +18,7 @@ The Core Microbiome Team
 
 """
     msg_str += user_args
+    message = make_base_email(subj, to_email, msg_str)
     message.body = msg_str
     message.attachments = [
         ('results.tsv', results.encode('utf-8')),
@@ -38,14 +31,6 @@ def send_error_as_email(timestmp, user_args, error, to_email):
     logging.warn(error)
     subj = 'There was an error in processing your data from %s'\
            % timestmp
-    message = mail.EmailMessage(
-        sender="Core microbiome Support <richieangel@gmail.com>",
-        subject=subj)
-
-    # "User <richrr@vt.edu>" #Albert Johnson <Albert.Johnson@example.com>
-    email_to = 'User <' + to_email + '>'
-    message.to = email_to
-
     msg_str = """
 Dear User:
 
@@ -58,5 +43,14 @@ The Core Microbiome Team
 """
     msg_str += user_args
     msg_str += '\n' + error
-    message.body = msg_str
+    message = make_base_email(subj, to_email, msg_str)
     message.send()
+
+
+def make_base_email(subj, to_email, msg):
+    app_id = get_application_id()
+    return mail.EmailMessage(
+        sender="Core Microbiome <do-not-reply@%s.appspotmail.com>" % app_id,
+        subject=subj,
+        to='User <' + to_email + '>',
+        body=msg)
