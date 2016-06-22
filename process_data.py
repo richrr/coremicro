@@ -17,7 +17,7 @@ import pipeline.common
 # How many parallel pipes to have processing the randomized data
 MAX_NUM_PARALLEL = 50
 # When to start a new task rather than continuing processing in the original
-MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
+MAX_RUNNING_TIME = datetime.timedelta(minutes=9, seconds=30)
 
 
 class RunPipeline(pipeline.Pipeline):
@@ -77,12 +77,15 @@ class RunPipeline(pipeline.Pipeline):
 
 class RunRandomDataPipeline(pipeline.Pipeline):
     def run(self, data, mapping_dict, factor, group, out_group, DELIM, num):
+        logging.info('Pipeline %s starting run of %d randomizations',
+                     self.pipeline_id, num)
         start = datetime.datetime.now()
         core_comp = dict()
         out_comp = dict()
-        rest = ''
         for i in range(num):
             try:
+                logging.info('Pipeline %s running run %d of %d',
+                             self.pipeline_id, i + 1, num)
                 randomized_mapping = convert_shuffled_dict_to_str(
                     shuffle_dicts(mapping_dict), factor)
                 add_result(core_comp, run_data(data, randomized_mapping,
@@ -92,14 +95,14 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                 now = datetime.datetime.now()
                 if now - start > MAX_RUNNING_TIME:
                     logging.info(
-                        'Pipeline %s tarting child process to avoid deadline',
+                        'Pipeline %s starting child process to avoid deadline',
                         self.pipeline_id)
                     write_random_result(self.root_pipeline_id,
                                         self.pipeline_id, core_comp, out_comp)
-                    rest = yield RunRandomDataPipeline(data, mapping_dict,
-                                                       factor, group,
-                                                       out_group, DELIM,
-                                                       num - i - 1)
+                    yield RunRandomDataPipeline(data, mapping_dict,
+                                                factor, group,
+                                                out_group, DELIM,
+                                                num - i - 1)
                     break
             except DeadlineExceededError:
                 logging.info(
@@ -107,16 +110,16 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                     self.pipeline_id)
                 write_random_result(self.root_pipeline_id, self.pipeline_id,
                                     core_comp, out_comp)
-                rest = yield RunRandomDataPipeline(data, mapping_dict, factor,
-                                                   group, out_group, DELIM,
-                                                   num - i - 1)
+                yield RunRandomDataPipeline(data, mapping_dict, factor,
+                                            group, out_group, DELIM,
+                                            num - i - 1)
                 break
             if i == num - 1:
                 logging.info('Pipeline %s processed all runs',
                              self.pipeline_id)
                 write_random_result(self.root_pipeline_id, self.pipeline_id,
                                     core_comp, out_comp)
-        yield pipeline.common.Ignore(rest)
+                return
 
 
 def add_result(compiled, result):
