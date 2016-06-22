@@ -4,9 +4,10 @@ from google.appengine.api.app_identity import get_application_id
 import logging
 
 
-def send_results_as_email(timestmp, user_args, results, tree,
-                          to_email,):
-    subj = "Your data from %s has been processed" % timestmp
+def send_results_as_email(timestmp, user_args, results, tree, name,
+                          to_email):
+    subj = "Your data from %s with name %s has been processed" % (timestmp,
+                                                                  name)
     msg_str = """
 Dear User:
 
@@ -21,16 +22,16 @@ The Core Microbiome Team
     message = make_base_email(subj, to_email, msg_str)
     message.body = msg_str
     message.attachments = [
-        ('results.tsv', results.encode('utf-8')),
-        ('results.nh', tree.encode('utf-8'))
+        ('results_%s.tsv' % name, results.encode('utf-8')),
+        ('tree_%s.nh' % name, tree.encode('utf-8'))
     ]
     message.send()
 
 
-def send_error_as_email(timestmp, user_args, error, to_email):
+def send_error_as_email(timestmp, user_args, error, name, to_email):
     logging.warn(error)
-    subj = 'There was an error in processing your data from %s'\
-           % timestmp
+    subj = 'There was an error in processing your data from %s with name %s'\
+           % (timestmp, name)
     msg_str = """
 Dear User:
 

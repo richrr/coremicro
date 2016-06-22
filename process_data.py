@@ -60,16 +60,17 @@ class RunPipeline(pipeline.Pipeline):
         timestamp = params['timestamp']
         user_args = params['user_args']
         to_email = params['to_email']
+        name = params['name']
 
         if self.was_aborted:
             error = 'An unknown error has occured. Please try again. ' +\
                     'If this occurs again please contact the developers'
-            send_error_as_email(timestamp, user_args, error, to_email)
+            send_error_as_email(timestamp, user_args, error, name, to_email)
         else:
             results_string = self.outputs.default.value[0]
             tree = self.outputs.default.value[1]
             send_results_as_email(timestamp, user_args, results_string, tree,
-                                  to_email)
+                                  name, to_email)
         clean_storage(self.root_pipeline_id)
         self.cleanup()
 

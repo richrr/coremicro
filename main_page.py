@@ -17,6 +17,7 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(MAIN_PAGE_HTML.format(upload_url))
 
     def post(self):
+        name = self.request.get('name')
         data = self.request.get('datafile')
         mapping_file = self.request.get('groupfile').split('\n')
 
@@ -36,6 +37,7 @@ class MainPage(webapp2.RequestHandler):
                      % (factor, group, p_val_adj, NTIMES))
 
         params = {
+            'name': name,
             'mapping_file': mapping_file,
             'factor': factor,
             'group': group,
