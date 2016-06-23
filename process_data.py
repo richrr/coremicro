@@ -16,8 +16,9 @@ import pipeline.common
 
 # How many parallel pipes to have processing the randomized data
 MAX_NUM_PARALLEL = 50
-# When to start a new task rather than continuing processing in the original
-MAX_RUNNING_TIME = datetime.timedelta(minutes=9, seconds=30)
+# If it looks like the task will run longer than this to do another itteration
+# start a new task
+MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
 
 
 class RunPipeline(pipeline.Pipeline):
@@ -93,7 +94,8 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                 add_result(out_comp, run_data(data, randomized_mapping,
                                               factor, out_group, DELIM))
                 now = datetime.datetime.now()
-                if now - start > MAX_RUNNING_TIME:
+                # assume the next run will take the average of completed runs
+                if (now - start) / (i + 1) + now > MAX_RUNNING_TIME:
                     logging.info(
                         'Pipeline %s starting child process to avoid deadline',
                         self.pipeline_id)
