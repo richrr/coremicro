@@ -17,127 +17,134 @@
   </head>
   <body>
     <div id="content">
+      <a href="/">back</a>
       <h1>Documentation</h1>
       The COREMIC tool is a webtool hosted on google app engine and written in python.
-      For details about the algorithm used in the tool, please refer and cite:
+      For details about the algorithm used in the tool, please refer to and cite:
       <....>
-      
-      <H2>Table of Contents</H2>
-		<P>
-		<A href="#section1">Input files</A><BR>
-		<A href="#section2">Options</A><BR>
-		<A href="#section3">Method details</A><BR>
-		<A href="#section4">FAQs</A><BR>
+        
+        <h2>Table of Contents</h2>
+        <ol>
+	  <li><a href="#input_files">Input files</a></li>
+	  <li><a href="#options">Options</a></li>
+	  <li><a href="#method">Method details</a></li>
+          <li><a href="#sample_data">Sample Data</a></li>
+	  <li><a href="#faq">FAQs</a></li>
+        </ol>
+	<h2 id="input_files">Input files</h2>
+	The tool needs exactly two input files
+  	<h3>Datafile</h3>
+  	The file basically contains abundance information of OTUs across 
+	samples. Please refer <a href="http://biom-format.org/index.html">here</a> for 
+	details of the BIOM format, why it is useful, or how to convert from traditional 
+	tab delimited OTU table to BIOM format file.<br>
+	
+	<b>Please make sure the header "taxonomy" is present and each OTU taxonomy is unique.</b>
+	Most often this file would be an output from the OTU picking step from QIIME or 
+	other tools. A QIIME 1.8 compatible sample 
+	<a href="http://biom-format.org/documentation/format_versions/biom-1.0.html">
+	  BIOM 1.0 format file</a> looks like:
+	<pre>
+          {
+          "id": "None",
+          "format": "Biological Observation Matrix 1.0.0",
+          "format_url": "http://biom-format.org",
+          "type": "OTU table",
+          "generated_by": "BIOM-Format 1.3.1",
+          "date": "2016-01-14T19:49:54.900111",
+          "matrix_type": "sparse",
+          "matrix_element_type": "float",
+          "shape": [678, 59],
+          "data": [[0,0,4.0],
+	  [0,1,2.0],
+	  [0,6,1.0],
+	  [0,7,10.0],
+	  ...
+	  [677,55,18.0],
+	  [677,56,33.0],
+	  [677,57,8.0],
+	  [677,58,14.0]],
+          "rows": [{"id": "1", "metadata": {"taxonomy": "k__Bacteria"}},
+	  {"id": "2", "metadata": {"taxonomy": "k__Bacteria;p__Acido...;f__;g__;s__"}},
+	  {"id": "3", "metadata": {"taxonomy": "k__Bacteria;p__Basido...;f__;g__;s__"}},
+    	  {"id": "4", "metadata": {"taxonomy": "k__Bacteria;p__Proteo...;f__;g__;s__"}},
+	  ...
+   	  {"id": "675", "metadata": {"taxonomy": "k__Bacteria;p__WS3...;f__XYZ;g__;s__"}},
+	  {"id": "676", "metadata": {"taxonomy": "k__Bacteria;p__WS3...;f__PRR;g__;s__"}},
+	  {"id": "677", "metadata": {"taxonomy": "k__Bacteria;p__WS3...;f__;g__;s__"}},
+    	  {"id": "678", "metadata": {"taxonomy": "Unassigned"}}],
+          "columns": [{"id": "SAMP1", "metadata": null},
+	  {"id": "SAMP1", "metadata": null},
+	  {"id": "SAMP2", "metadata": null},
+	  ...
+	  {"id": "SAMP58", "metadata": null},
+	  {"id": "SAMP59", "metadata": null}]
+          }
+        </pre>
+	
+	
+	<h3>Group file</h3> 
+	This <b>tab-delimited</b> file contains information 
+	about the samples and the groups to which they belong.<br>
+        
+	<b>Please make sure the group of interest "Person" is binary ("Good" vs "Bad").
+	  "#SampleID" and a group of interest columns are required.</b> Other columns
+	are optional (e.g.BarcodeSequence, LinkerPrimerSequence, Description). 
+	Most often this file would be an input to the OTU picking step from QIIME or 
+	other tools. A QIIME 1.8 compatible sample 
+	<a href="http://qiime.org/documentation/file_formats.html#mapping-file-overview">
+	  group file</a> looks like:
+        
+	<pre>
+          #SampleID	Person
+          SAMP1	Good
+          SAMP2	Good
+          ...
+          SAMP58	Bad
+          SAMP59	Bad
+	</pre>
+        
+        <h2 id="options">Options</h2>
+        These are some of the options that need to provided:
+        <dl>
+          <dt>Name for output/label</dt>
+          <dd>This helps you to keep track of what this run indicates. It will be included in 
+            name of all attached result files and the subject of all emails about your run.</dd>
+          <dt>Interest group</dt>
+          <dd>Enter ":" delimited EXACT string of the interest group on which you want core 
+            microbiome analysis to be performed. For example, to calculate core microbiome of
+            "Good" under the "Person" group (column), enter "Person:Good".</dd>
+          <dt>Number of randomizations</dt>
+          <dd>Used to estimate the significance of core OTUs. Please keep this number greater
+            than 500 and less than a 1500. 1000 is a good default.</dd>
+          <dt><i>p</i>-value adjustment method</dt>
+          <dd>To correct for multiple testings of OTUs. Benjamini Hochberg is a good default.</dd>
+          <dt>Email</dt>
+          <dd>The email address where you want your results emailed. <b>Your results are NOT 
+              stored;</b> you will only get these results via email. </dd>
+        </dl>
+        
+        <h2 id="method">Method Details</h2>
+        Currently, the tool uses presence absence data to identify core microbiome OTUs.
+        <br>
+        <img src="images/ms3-core-microb-overflow-latest-orig-data-details-all-data-6.jpg" 
+             alt="Algorithm" style="width:604px;height:450px;"> <br>
+        
+        Future versions of this tool will include more complicated algorithms.
 
-		<H3 id="section1">Input files</H3>
-		The tool needs exactly two input files: <BR>
-		<ul>
-  		<li><b>Datafile:</b></li>
-  		The file basically contains abundance information of OTUs across 
-		samples. Please refer <A href="http://biom-format.org/index.html">here</A> for 
-		details of the BIOM format, why it is useful, or how to convert from traditional 
-		tab delimited OTU table to BIOM format file.<BR>
-		
-		<b>Please make sure the header "taxonomy" is present and each OTU taxonomy is unique.</b>
-	    Most often this file would be an output from the OTU picking step from QIIME or 
-	    other tools. A QIIME 1.8 compatible sample 
-	    <A href="http://biom-format.org/documentation/format_versions/biom-1.0.html">
-	    BIOM 1.0 format file</A> looks like:
-	    <pre><code>
-{
-"id": "None",
-"format": "Biological Observation Matrix 1.0.0",
-"format_url": "http://biom-format.org",
-"type": "OTU table",
-"generated_by": "BIOM-Format 1.3.1",
-"date": "2016-01-14T19:49:54.900111",
-"matrix_type": "sparse",
-"matrix_element_type": "float",
-"shape": [678, 59],
-"data": [[0,0,4.0],
-	[0,1,2.0],
-	[0,6,1.0],
-	[0,7,10.0],
-	...
-	[677,55,18.0],
-	[677,56,33.0],
-	[677,57,8.0],
-	[677,58,14.0]],
-"rows": [{"id": "1", "metadata": {"taxonomy": "k__Bacteria"}},
-	{"id": "2", "metadata": {"taxonomy": "k__Bacteria;p__Acido...;f__;g__;s__"}},
-	{"id": "3", "metadata": {"taxonomy": "k__Bacteria;p__Basido...;f__;g__;s__"}},
-    	{"id": "4", "metadata": {"taxonomy": "k__Bacteria;p__Proteo...;f__;g__;s__"}},
-	...
-   	{"id": "675", "metadata": {"taxonomy": "k__Bacteria;p__WS3...;f__XYZ;g__;s__"}},
-	{"id": "676", "metadata": {"taxonomy": "k__Bacteria;p__WS3...;f__PRR;g__;s__"}},
-	{"id": "677", "metadata": {"taxonomy": "k__Bacteria;p__WS3...;f__;g__;s__"}},
-    	{"id": "678", "metadata": {"taxonomy": "Unassigned"}}],
-"columns": [{"id": "SAMP1", "metadata": null},
-	{"id": "SAMP1", "metadata": null},
-	{"id": "SAMP2", "metadata": null},
-	...
-	{"id": "SAMP58", "metadata": null},
-	{"id": "SAMP59", "metadata": null}]
-}
-	    </code></pre>
-	    
-	     
-		<li><b>Group file:</b></li> 
-		This <b>tab-delimited</b> file contains information 
-		about the samples and the groups to which they belong.<BR>
-
-		<b>Please make sure the group of interest "Person" is binary ("Good" vs "Bad").
-		"#SampleID" and a group of interest columns are required.</b> Other columns
-		are optional (e.g.BarcodeSequence, LinkerPrimerSequence, Description). 
-		Most often this file would be an input to the OTU picking step from QIIME or 
-	    other tools. A QIIME 1.8 compatible sample 
-	    <A http://qiime.org/documentation/file_formats.html#mapping-file-overview">
-	    group file</A> looks like:
-
-	    <pre><code>
-#SampleID	Person
-SAMP1	Good
-SAMP2	Good
-...
-SAMP58	Bad
-SAMP59	Bad
-	    </code></pre>
-		</ul>
-
-		
-		<H3 id="section2">Options</H3>
-		These are some of the options that need to provided:
-		<ul>
-		<li><b>Name for output/label</b></li>
-		This helps you to keep track of what this run indicates.
-		<li><b>Interest group</b></li>
-		Enter ":" delimited EXACT string of the interest group on which you want core 
-		microbiome analysis to be performed. For example, to calculate core microbiome of
-		"Good" under the "Person" group (column), enter "Person:Good".
-		<li><b>Number of randomizations</b></li>
-		Used to estimate the significance of core OTUs. Please keep this number greater
-		than 500 and less than a 1500. 1000 is a good default.
-		<li><b><i>p</i>-value adjustment method</b></li>
-		To correct for multiple testings of OTUs. Benjamini Hochberg is a good default.
-		<li><b>Email</b></li>
-		The email address where you want your results emailed. <b>Your results are NOT 
-		stored;</b> you will only get these results via email.
-		</ul>
-
-		<H3 id="section3">Method details</H3>
-		Currently, the tool uses presence absence data to identify core microbiome OTUs.
-		<BR>
-		<img src="images/ms3-core-microb-overflow-latest-orig-data-details-all-data-6.jpg" 
-		alt="Algorithm" style="width:604px;height:450px;"> <BR>
-
-		Future version of this tool will include more complicated algorithms.
-
-		<H3 id="section3">FAQs</H3>
-		For questions or feature requests, please email markwill@vt.edu
-    
-    <!-- Scripts for Bootstrap -->
-    
-    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+        <h2 id="sample_data">Sample Data</h2>
+        A sample datafile can be downloaded <a href="sample_data/otu_table_16s.biom">here</a> and a
+        sample groupfile can be downloaded <a href="sample_data/sample-sheet-qiime.txt">here</a>.
+        
+        <h2 id="faq">FAQs</H2>
+        For questions or feature requests, please email <a href="mail:markwill@vt.edu">
+          markwill@vt.edu</a>
+        
+        
+        <!-- Scripts for Bootstrap -->
+        
+        <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    </div>
   </body>
 </html>
