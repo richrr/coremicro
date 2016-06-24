@@ -95,7 +95,7 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                                               factor, out_group, DELIM))
                 now = datetime.datetime.now()
                 # assume the next run will take the average of completed runs
-                if (now - start) / (i + 1) + now > MAX_RUNNING_TIME:
+                if ((now - start) * (i + 2)) // (i + 1) > MAX_RUNNING_TIME:
                     logging.info(
                         'Pipeline %s starting child process to avoid deadline',
                         self.pipeline_id)
