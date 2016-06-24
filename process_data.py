@@ -15,7 +15,7 @@ import pipeline
 import pipeline.common
 
 # How many parallel pipes to have processing the randomized data
-MAX_NUM_PARALLEL = 50
+MAX_NUM_PARALLEL = 20
 # If it looks like the task will run longer than this to do another itteration
 # start a new task
 MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
