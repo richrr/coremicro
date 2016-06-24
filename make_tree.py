@@ -102,14 +102,17 @@ def build_taxonomy_code_map(filename):
 
 
 def make_tree(core, out):
-    logging.info('importing')
-    tree = load_gg_tree('tree_files/97_otus.tree')
-    logging.info('building map')
-    mapping = build_taxonomy_code_map('tree_files/97_otu_taxonomy.txt')
-    logging.info('finding and marking core and out groups')
-    core_nodes = annotate_group(core, tree, mapping, IN_CORE_FEATURE)
-    out_nodes = annotate_group(out, tree, mapping, IN_OUT_FEATURE)
-    logging.info('pruning')
+    # logging.info('importing')
+    # tree = load_gg_tree('tree_files/97_otus.tree')
+    # logging.info('building map')
+    # mapping = build_taxonomy_code_map('tree_files/97_otu_taxonomy.txt')
+    # logging.info('finding and marking core and out groups')
+    # core_nodes = annotate_group(core, tree, mapping, IN_CORE_FEATURE)
+    # out_nodes = annotate_group(out, tree, mapping, IN_OUT_FEATURE)
+    # logging.info('pruning')
     # tree.prune(core_nodes + out_nodes)
+
+    logging.info('Making dummy tree')
+    tree = Tree()
 
     return tree.write(features=[], format=0)
