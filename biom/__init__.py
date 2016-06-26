@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+# empty file to make this folder a package. The default init file from
+# biom is not used here.
+
+#!/usr/bin/env python
 
 #-----------------------------------------------------------------------------
 # Copyright (c) 2011-2013, The BIOM Format Development Team.
@@ -29,14 +33,16 @@ try:
     import numpy
 except ImportError:
     raise ImportError, "numpy cannot be found. Can't continue."
-
+'''
 try:
     import pyqi
 except ImportError:
     raise ImportError, "pyqi cannot be found. Can't continue."
 
 biom_config = load_biom_config()
+'''
 
+biom_config = dict()
 sparse_backends = ['CSMat', 'ScipySparseMat']
 
 def set_sparse_backend(sparse_backend, warn=True):
@@ -68,6 +74,8 @@ def get_sparse_backend():
     InvalidSparseBackendException if the current sparse backend isn't supported
     or cannot be used for whatever reason.
     """
+    backend = 'CSMat'
+    '''
     backend = biom_config['python_code_sparse_backend']
     if backend is None:
         backend = 'CSMat'
@@ -76,7 +84,7 @@ def get_sparse_backend():
         raise InvalidSparseBackendException("Unrecognized sparse backend "
                                             "'%s'. Choose from %s." % (backend,
                                             ', '.join(sparse_backends)))
-
+    '''
     valid_backend = False
     if backend == 'ScipySparseMat':
         try:

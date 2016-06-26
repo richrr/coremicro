@@ -16,8 +16,8 @@ import re
 from hashlib import md5
 from gzip import open as gzip_open
 from numpy import mean, median, min, max
-from pyqi.util import pyqi_system_call
-from pyqi.core.log import StdErrLogger
+#from pyqi.util import pyqi_system_call
+#from pyqi.core.log import StdErrLogger
 
 __author__ = "Daniel McDonald"
 __copyright__ = "Copyright 2011-2013, The BIOM Format Development Team"
