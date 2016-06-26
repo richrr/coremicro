@@ -3,7 +3,7 @@ from biom.table import SparseOTUTable, DenseOTUTable, table_factory
 import json
 from numpy import zeros, asarray, uint32, float64
 from string import strip
-
+import sys
 
 ######################################################################
 # READ FILE, ARG: FILENAME
@@ -195,4 +195,33 @@ biom_list_of_lines = read_file("static/sample_data/otu_table_16s.biom")
 otu_table = main_converter(biom_list_of_lines, header_key="taxonomy")
 #print otu_table
 
+
 # convert table to scikit input
+
+dataset = []
+ignore_idx = []
+for otu in otu_table.split('\n'):
+    #print otu
+    otu = otu.strip()
+    
+    if '#' in otu or otu == '':
+        if '#OTU ID' in otu:
+            ignore_idx.append(otu.split('\t').index('#OTU ID'))
+        if 'taxonomy' in otu:
+            ignore_idx.append(otu.split('\t').index('taxonomy'))
+        #sys.exit(0)
+        continue
+    
+    vals = otu.split('\t')
+    digits = [vals[idx] for idx in range(len(vals)) if idx not in ignore_idx]
+    dataset.append(digits)
+    #sys.exit(0)
+
+#print dataset
+
+from sklearn import datasets
+'''
+iris = datasets.load_iris()
+iris_X = iris.data
+iris_y = iris.target
+'''
