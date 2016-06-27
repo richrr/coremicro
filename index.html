@@ -47,6 +47,16 @@
           </p>
         </div>
         <div class="form-group">
+          <label for="include_out">Include Out-Group Results</label><br>
+	  <input type="checkbox" id="include_out" name="include_out" checked>
+          <p class="help-block">
+            Whether the results of running the processing on the out-group should be included in the email as well.
+            This is equivalent to re-running the processing with the interest group not selected in the previous field.
+            For example, Person:Bad, rather than Person:Good.
+          </p>
+        </div>
+
+        <div class="form-group">
           <label for="random">Number of randomizations</label><br>
 	  <input type="number" name="random" value="1000" size="30" max="1500" required>
           <p class="help-block">

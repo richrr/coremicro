@@ -22,11 +22,11 @@ MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
 
 
 class RunPipeline(pipeline.Pipeline):
-    def run(self, params):
+    def run(self, params, inputs):
         logging.info('Starting run')
-        data = params['data']
-        mapping_file = params['mapping_file']
-        mapping_dict = params['mapping_dict']
+        data = inputs['data']
+        mapping_file = inputs['mapping_file']
+        mapping_dict = inputs['mapping_dict']
         factor = params['factor']
         group = params['group']
         out_group = params['out_group']
