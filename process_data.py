@@ -69,8 +69,10 @@ class RunPipeline(pipeline.Pipeline):
             send_error_as_email(timestamp, user_args, error, name, to_email)
         else:
             results_string = self.outputs.default.value[0]
-            tree = self.outputs.default.value[1]
-            send_results_as_email(timestamp, user_args, results_string, tree,
+            out_results_string = self.outputs.default.value[1]
+            tree = self.outputs.default.value[2]
+            send_results_as_email(timestamp, user_args, results_string,
+                                  out_results_string, tree,
                                   name, to_email)
         clean_storage(self.root_pipeline_id)
         self.cleanup()

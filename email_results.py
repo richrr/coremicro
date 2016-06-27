@@ -4,7 +4,7 @@ from google.appengine.api.app_identity import get_application_id
 import logging
 
 
-def send_results_as_email(timestmp, user_args, results, tree, name,
+def send_results_as_email(timestmp, user_args, results, out, tree, name,
                           to_email):
     subj = "Your data from %s with name %s has been processed" % (timestmp,
                                                                   name)
@@ -23,6 +23,7 @@ The Core Microbiome Team
     message.body = msg_str
     message.attachments = [
         ('results_%s.tsv' % name, results.encode('utf-8')),
+        ('out_results_%s.nsv' % name, out.encode('utf-8')),
         ('tree_%s.nh' % name, tree.encode('utf-8'))
     ]
     message.send()

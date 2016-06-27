@@ -23,7 +23,8 @@ class ProcessResultsPipeline(PipelineBase):
                                     NTIMES)
         tree = make_tree(core_res, out_res)
         results_string = format_results(core_res, p_val_adj)
-        return [results_string, tree]
+        out_results_string = format_results(out_res, p_val_adj)
+        return [results_string, out_results_string, tree]
 
 
 def combine_results(results):
