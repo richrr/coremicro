@@ -58,22 +58,17 @@ class RunPipeline(pipeline.Pipeline):
     def finalized(self):
         logging.info('Finalizing task')
         params = self.args[0]
-        timestamp = params['timestamp']
-        user_args = params['user_args']
-        to_email = params['to_email']
-        name = params['name']
 
         if self.was_aborted:
             error = 'An unknown error has occured. Please try again. ' +\
                     'If this occurs again please contact the developers'
-            send_error_as_email(timestamp, user_args, error, name, to_email)
+            send_error_as_email(params, error)
         else:
             results_string = self.outputs.default.value[0]
             out_results_string = self.outputs.default.value[1]
             tree = self.outputs.default.value[2]
-            send_results_as_email(timestamp, user_args, results_string,
-                                  out_results_string, tree,
-                                  name, to_email)
+            send_results_as_email(params, results_string, out_results_string,
+                                  tree)
         clean_storage(self.root_pipeline_id)
         self.cleanup()
 
