@@ -27,6 +27,7 @@
         <ol>
 	  <li><a href="#input_files">Input files</a></li>
 	  <li><a href="#options">Options</a></li>
+          <li><a href="#outputs">Output Files</a><li>
 	  <li><a href="#method">Method details</a></li>
           <li><a href="#sample_data">Sample Data</a></li>
 	  <li><a href="#faq">FAQs</a></li>
@@ -114,6 +115,11 @@
           <dd>Enter ":" delimited EXACT string of the interest group on which you want core 
             microbiome analysis to be performed. For example, to calculate core microbiome of
             "Good" under the "Person" group (column), enter "Person:Good".</dd>
+          <dt>Include Out-Group Results</dt>
+          <dd>Whether the results of running the processing on the out-group should be included
+            in the email as well. This is equivalent to re-running the processing with the
+            interest group not selected in the previous field. For example, Person:Bad, rather
+            than Person:Good.</dd>
           <dt>Number of randomizations</dt>
           <dd>Used to estimate the significance of core OTUs. Please keep this number greater
             than 500 and less than a 1500. 1000 is a good default.</dd>
@@ -123,6 +129,18 @@
           <dd>The email address where you want your results emailed. <b>Your results are NOT 
               stored;</b> you will only get these results via email. </dd>
         </dl>
+
+        <h2 id="outputs">Output Files</h2>
+        <p>When the tool is finished running the results will be emailed to the email address it
+          was given. The results of the analysis are attached to the email as a .tsv file, which
+          can be opened in a number of programs including Excel. The first column lists the OTUs
+          that were found to be in the core-microbiome of the interest group. These are divided up
+          into buckets based on what threshold they met. For each significant OTU the number of
+          times it was found in the randomized data, the p-value initially calculated, and the
+          p-value adjusted using the specified method. If the option to run analysis on the
+          out-group was selected as well then a second .tsv file will be attached containing those
+          results.
+        </p>
         
         <h2 id="method">Method Details</h2>
         Currently, the tool uses presence absence data to identify core microbiome OTUs.
