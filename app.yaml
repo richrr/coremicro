@@ -1,5 +1,5 @@
 application: coremic
-version: 1
+version: opt-no-core
 runtime: python27
 api_version: 1
 threadsafe: true
@@ -8,6 +8,8 @@ instance_class: F4
 automatic_scaling:
   max_idle_instances: 1
   min_idle_instances: 0
+  max_pending_latency: 30ms
+  min_pending_latency: 15ms
 
 handlers:
 - url: /_ah/pipeline.*
