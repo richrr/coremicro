@@ -60,6 +60,24 @@ class MainPage(webapp2.RequestHandler):
         params['out_group'] = out_group
         inputs['mapping_dict'] = mapping_dict
 
+        params['run_cfgs'] = [
+            {
+                'factor': factor,
+                'group': group,
+                'delim': DELIM,
+                'name': 'core'
+            }
+        ]
+
+        if include_out:
+            params['run_cfgs'].append({
+                'factor': factor,
+                'group': out_group,
+                'delim': DELIM,
+                'name': 'out'
+                }
+            )
+
         if len(errors_list) > 0:
             send_error_as_email(timestamp, user_args, '\n'.join(errors_list),
                                 to_email)

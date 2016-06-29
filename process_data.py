@@ -26,15 +26,9 @@ class RunPipeline(pipeline.Pipeline):
         logging.info('Starting run')
         data = inputs['data']
         mapping_file = inputs['mapping_file']
-        mapping_dict = inputs['mapping_dict']
-        factor = params['factor']
-        group = params['group']
-        out_group = params['out_group']
-        DELIM = params['delim']
         NTIMES = int(params['ntimes'])
 
-        core = run_data(data, mapping_file, factor, group, DELIM)
-        out = run_data(data, mapping_file, factor, out_group, DELIM)
+        true_res = run_data(data, mapping_file, params['run_cfgs'])
         processing = []
         if NTIMES <= MAX_NUM_PARALLEL:
             pipes = [1 for i in range(NTIMES)]
@@ -47,13 +41,11 @@ class RunPipeline(pipeline.Pipeline):
         logging.info('Starting %d parallel tasks for randomized data',
                      len(pipes))
         for num_in_task in pipes:
-            res = yield RunRandomDataPipeline(data, mapping_dict,
-                                              factor, group, out_group, DELIM,
-                                              num_in_task)
+            res = yield RunRandomDataPipeline(inputs, params, num_in_task)
             processing.append(res)
         with pipeline.InOrder():
             yield pipeline.common.Ignore(*processing)
-            yield ProcessResultsPipeline(params, core, out)
+            yield ProcessResultsPipeline(params, true_res)
 
     def finalized(self):
         logging.info('Finalizing task')
@@ -64,32 +56,27 @@ class RunPipeline(pipeline.Pipeline):
                     'If this occurs again please contact the developers'
             send_error_as_email(params, error)
         else:
-            results_string = self.outputs.default.value[0]
-            out_results_string = self.outputs.default.value[1]
-            tree = self.outputs.default.value[2]
-            send_results_as_email(params, results_string, out_results_string,
-                                  tree)
+            attachments = self.outputs.default.value
+            send_results_as_email(params, attachments)
         clean_storage(self.root_pipeline_id)
         self.cleanup()
 
 
 class RunRandomDataPipeline(pipeline.Pipeline):
-    def run(self, data, mapping_dict, factor, group, out_group, DELIM, num):
+    def run(self, inputs, params, num):
         logging.info('Pipeline %s starting run of %d randomizations',
                      self.pipeline_id, num)
         start = datetime.datetime.now()
-        core_comp = dict()
-        out_comp = dict()
+        res = {cfg['name']: dict() for cfg in params['run_cfgs']}
         for i in range(num):
             try:
                 logging.info('Pipeline %s running run %d of %d',
                              self.pipeline_id, i + 1, num)
                 randomized_mapping = convert_shuffled_dict_to_str(
-                    shuffle_dicts(mapping_dict), factor)
-                add_result(core_comp, run_data(data, randomized_mapping,
-                                               factor, group, DELIM))
-                add_result(out_comp, run_data(data, randomized_mapping,
-                                              factor, out_group, DELIM))
+                    shuffle_dicts(inputs['mapping_dict']), params['factor'])
+                add_result(res, run_data(inputs['data'],
+                                         randomized_mapping,
+                                         params['run_cfgs']))
                 now = datetime.datetime.now()
                 # assume the next run will take the average of completed runs
                 if ((now - start) * (i + 2)) // (i + 1) > MAX_RUNNING_TIME:
@@ -97,57 +84,55 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                         'Pipeline %s starting child process to avoid deadline',
                         self.pipeline_id)
                     write_random_result(self.root_pipeline_id,
-                                        self.pipeline_id, core_comp, out_comp)
-                    yield RunRandomDataPipeline(data, mapping_dict,
-                                                factor, group,
-                                                out_group, DELIM,
-                                                num - i - 1)
+                                        self.pipeline_id, res)
+                    yield RunRandomDataPipeline(inputs, params, num - i - 1)
                     break
             except DeadlineExceededError:
                 logging.info(
                     'Pipeline %s ran out of time; starting child process',
                     self.pipeline_id)
                 write_random_result(self.root_pipeline_id, self.pipeline_id,
-                                    core_comp, out_comp)
-                yield RunRandomDataPipeline(data, mapping_dict, factor,
-                                            group, out_group, DELIM,
-                                            num - i - 1)
+                                    res)
+                yield RunRandomDataPipeline(inputs, params, num - i - 1)
                 break
             if i == num - 1:
                 logging.info('Pipeline %s processed all runs',
                              self.pipeline_id)
                 write_random_result(self.root_pipeline_id, self.pipeline_id,
-                                    core_comp, out_comp)
+                                    res)
                 return
 
 
 def add_result(compiled, result):
-    for threshold, otus in result.items():
-        if threshold in compiled:
-            compiled[threshold].update(otus)
-        else:
-            compiled[threshold] = collections.Counter(otus)
+    for cfg in result:
+        for threshold, otus in result[cfg].items():
+            if threshold in compiled[cfg]:
+                compiled[cfg][threshold].update(otus)
+            else:
+                compiled[cfg][threshold] = collections.Counter(otus)
 
 
-def run_data(data, mapping, factor, group, DELIM):
-    result = exec_core_microb_cmd(data, 'dir', mapping, factor, group)
-    # compile original results. The key is frac_threshold,
-    # value is a list of unique otus
-    compiled = dict()
-    # return the items in sorted order
-    for frac_thresh, core_OTUs_biom in (
-            sorted(result['frac_thresh_core_OTUs_biom'].items(),
-                   key=lambda (key, value): int(key))):
-        OTUs, biom = core_OTUs_biom  # this is a tuple of otus and biom
-        compiled[frac_thresh] = compile_results(OTUs, DELIM)
+def run_data(data, mapping, run_cfgs):
+    res = dict()
+    for cfg in run_cfgs:
+        raw = exec_core_microb_cmd(data, 'dir', mapping,
+                                   cfg['factor'], cfg['group'])
+        # compile original results. The key is frac_threshold,
+        # value is a list of unique otus
+        compiled = dict()
+        # return the items in sorted order
+        for frac_thresh, core_OTUs_biom in (
+                sorted(raw['frac_thresh_core_OTUs_biom'].items(),
+                       key=lambda (key, value): int(key))):
+            OTUs, biom = core_OTUs_biom  # this is a tuple of otus and biom
+            compiled[frac_thresh] = compile_results(OTUs, cfg['delim'])
+        res[cfg['name']] = compiled
+    return res
 
-    return compiled
 
-
-def write_random_result(root_id, run_id, core, out):
+def write_random_result(root_id, run_id, res):
     logging.info('Writing results from pipeline %s', run_id)
-    return Result_RandomDict.add_entry(root_id,
-                                       run_id, core, out)
+    return Result_RandomDict.add_entry(root_id, run_id, res)
 
 
 # get unique elements from last column (otus)

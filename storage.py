@@ -11,13 +11,12 @@ def clean_storage(key):
 # for every random dict entry, it has different thresholds
 # the actual key is automatically generated
 class Result_RandomDict(ndb.Model):
-    core = ndb.JsonProperty()
-    out = ndb.JsonProperty()
+    res = ndb.JsonProperty()
 
     @classmethod
-    def add_entry(cls, root_id, run_id, core, out):
+    def add_entry(cls, root_id, run_id, res):
         return cls(parent=ndb.Key(cls, root_id),
-                   id=run_id, core=core, out=out).put()
+                   id=run_id, res=res).put()
 
     @classmethod
     def get_entries(cls, root_id):
