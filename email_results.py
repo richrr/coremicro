@@ -4,10 +4,9 @@ from google.appengine.api.app_identity import get_application_id
 import logging
 
 
-def send_results_as_email(timestmp, user_args, results, tree, name,
-                          to_email):
-    subj = "Your data from %s with name %s has been processed" % (timestmp,
-                                                                  name)
+def send_results_as_email(params, attachments):
+    subj = "Your data from %s with name %s has been processed" % (
+        params['timestamp'], params['name'])
     msg_str = """
 Dear User:
 
@@ -18,20 +17,26 @@ Please email us if you have any questions.
 The Core Microbiome Team
 
 """
-    msg_str += user_args
-    message = make_base_email(subj, to_email, msg_str)
+    msg_str += params['user_args']
+    message = make_base_email(subj, params['to_email'], msg_str)
     message.body = msg_str
-    message.attachments = [
-        ('results_%s.tsv' % name, results.encode('utf-8')),
-        ('tree_%s.nh' % name, tree.encode('utf-8'))
-    ]
+    message.attachments = attachments
+    # [
+    #     ('results_%s.tsv' % params['name'], results.encode('utf-8')),
+    #     ('tree_%s.nh' % params['name'], tree.encode('utf-8'))
+    # ]
+    # if params['include_out']:
+    #     message.attachments.append(
+    #         ('out_results_%s.nsv' % params['name'], out.encode('utf-8')),
+    #     )
+
     message.send()
 
 
-def send_error_as_email(timestmp, user_args, error, name, to_email):
+def send_error_as_email(params, error):
     logging.warn(error)
     subj = 'There was an error in processing your data from %s with name %s'\
-           % (timestmp, name)
+           % (params['timestamp'], params['name'])
     msg_str = """
 Dear User:
 
@@ -42,9 +47,9 @@ Please email us if you have any questions.
 The Core Microbiome Team
 
 """
-    msg_str += user_args
+    msg_str += params['user_args']
     msg_str += '\n' + error
-    message = make_base_email(subj, to_email, msg_str)
+    message = make_base_email(subj, params['to_email'], msg_str)
     message.send()
 
 

@@ -4,45 +4,35 @@ import logging
 from mapreduce.base_handler import PipelineBase
 
 from storage import Result_RandomDict
-from make_tree import make_tree
 
 
 class ProcessResultsPipeline(PipelineBase):
-    def run(self, params, core, out):
+    def run(self, params, true_res):
         logging.info('Processing results')
-        p_val_adj = params['p_val_adj']
-        DELIM = params['delim']
-        NTIMES = params['ntimes']
-        rand_res = Result_RandomDict.get_entries(self.root_pipeline_id)
-        core_rand, out_rand = combine_results(rand_res)
-        logging.info('Processing core data')
-        core_res = perform_sign_calc(core_rand, p_val_adj, DELIM, core,
-                                     NTIMES)
-        logging.info('Processing out-group data')
-        out_res = perform_sign_calc(out_rand, p_val_adj, DELIM, out,
-                                    NTIMES)
-        tree = make_tree(core_res, out_res)
-        results_string = format_results(core_res, p_val_adj)
-        return [results_string, tree]
+        rand = combine_results(
+            Result_RandomDict.get_entries(self.root_pipeline_id))
+        res = {k: perform_sign_calc(v, rand[k], params)
+               for k, v in true_res.iteritems()}
+        return get_attachments(res, params)
+
+
+def get_attachments(res, params):
+    attachments = [('%s_results_%s.tsv' % (k, params['name']),
+                    format_results(v, params['p_val_adj']))
+                   for k, v in res.iteritems()]
+    return attachments
 
 
 def combine_results(results):
-    core = dict()
-    out = dict()
-    for res in results:
-        res_core = res.core
-        for threshold, otus in res_core.items():
-            if threshold in core:
-                core[threshold].update(otus)
-            else:
-                core[threshold] = collections.Counter(otus)
-        res_out = res.out
-        for threshold, otus in res_out.items():
-            if threshold in out:
-                out[threshold].update(otus)
-            else:
-                out[threshold] = collections.Counter(otus)
-    return core, out
+    combined = {k: dict() for k, v in results.get().res.iteritems()}
+    for result in results:
+        for cfg in result.res:
+            for threshold, otus in result.res[cfg].items():
+                if threshold in combined[cfg]:
+                    combined[cfg][threshold].update(otus)
+                else:
+                    combined[cfg][threshold] = collections.Counter(otus)
+    return combined
 
 
 def format_results(results, p_val_adj):
@@ -58,9 +48,9 @@ def format_results(results, p_val_adj):
     return sign_results
 
 
-def perform_sign_calc(glob_qry_entries_in_result_rand_dict,
-                      p_val_adj, DELIM, true_result_frac_thresh_otus_dict,
-                      NTIMES):
+def perform_sign_calc(true_result_frac_thresh_otus_dict,
+                      glob_qry_entries_in_result_rand_dict,
+                      params):
     p_val = 0.05
     results = {}
     logging.info('Performing significance calculations')
@@ -81,7 +71,7 @@ def perform_sign_calc(glob_qry_entries_in_result_rand_dict,
             # randomized data!
             if o in randomized_otus:
                 freq = int(randomized_otus[o])
-            otus_pval = freq/float(NTIMES)
+            otus_pval = freq/float(params['ntimes'])
             if otus_pval < p_val:
                 signif_core_microb_otu_dict[o] = otus_pval
 
@@ -94,20 +84,20 @@ def perform_sign_calc(glob_qry_entries_in_result_rand_dict,
 
         # adjust the pvalues of significant otus for multiple testing
         new_p_vals = list()
-        if p_val_adj == 'bf':
+        if params['p_val_adj'] == 'bf':
             new_p_vals = correct_pvalues_for_multiple_testing(
                 signif_core_microb_otu_dict.values(), "Bonferroni")
-        elif p_val_adj == 'bh':
+        elif params['p_val_adj'] == 'bh':
             new_p_vals = correct_pvalues_for_multiple_testing(
                 signif_core_microb_otu_dict.values(), "Benjamini-Hochberg")
-        elif p_val_adj == 'none':
+        elif params['p_val_adj'] == 'none':
             new_p_vals = signif_core_microb_otu_dict.values()
 
         counter = 0
         for o in signif_core_microb_otu_dict.keys():
             freq = int(randomized_otus[o])
             # p value before correction (from randomized runs)
-            otus_pval = freq/float(NTIMES)
+            otus_pval = freq/float(params['ntimes'])
             new_p_v = new_p_vals[counter]  # p value after correction
             if new_p_v < p_val:
                 results[frac_s].append({

@@ -27,6 +27,7 @@ class MainPage(webapp2.RequestHandler):
         timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
 
         p_val_adj = self.request.get('pvaladjmethod')
+        include_out = bool(self.request.get('include_out'))
 
         to_email = self.request.get('email')
 
@@ -38,22 +39,44 @@ class MainPage(webapp2.RequestHandler):
 
         params = {
             'name': name,
-            'mapping_file': mapping_file,
             'factor': factor,
             'group': group,
             'p_val_adj': p_val_adj,
             'delim': DELIM,
             'ntimes': str(NTIMES),
             'to_email': to_email,
-            'data': data,
             'timestamp': timestamp,
             'user_args': user_args,
+            'include_out': include_out,
         }
 
-        errors_list, mapping_dict, out_group = validate_inputs(params)
+        inputs = {
+            'mapping_file': mapping_file,
+            'data': data,
+        }
+
+        errors_list, mapping_dict, out_group = validate_inputs(params, inputs)
 
         params['out_group'] = out_group
-        params['mapping_dict'] = mapping_dict
+        inputs['mapping_dict'] = mapping_dict
+
+        params['run_cfgs'] = [
+            {
+                'factor': factor,
+                'group': group,
+                'delim': DELIM,
+                'name': 'core'
+            }
+        ]
+
+        if include_out:
+            params['run_cfgs'].append({
+                'factor': factor,
+                'group': out_group,
+                'delim': DELIM,
+                'name': 'out'
+                }
+            )
 
         if len(errors_list) > 0:
             send_error_as_email(timestamp, user_args, '\n'.join(errors_list),
@@ -61,14 +84,14 @@ class MainPage(webapp2.RequestHandler):
             # TODO: Return form with error marked
             sys.exit(0)
 
-        pipeline = RunPipeline(params)
+        pipeline = RunPipeline(params, inputs)
         pipeline.start()
 
         self.redirect('/')
 
 
-def validate_inputs(params):
-    mapping_file = params['mapping_file']
+def validate_inputs(params, inputs):
+    mapping_file = inputs['mapping_file']
     DELIM = params['delim']
     factor = params['factor']
     group = params['group']
