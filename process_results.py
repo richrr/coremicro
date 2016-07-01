@@ -39,9 +39,9 @@ def format_results(results, p_val_adj):
     sign_results = (('Significant results:\nOTU\tFreq. in randomized ' +
                      'data\tpval=freq/times randomized\t%s corrected pval\n')
                     % p_val_adj)
-    for frac in sorted(results.keys()):
+    for frac in sorted(map(int, results.keys())):
         sign_results += '\n#Frac thresh %s\n' % str(frac)
-        for otu in results[frac]:
+        for otu in results[str(frac)]:
             sign_results += '%s\t%s\t%s\t%s\n' % (otu['otu'], otu['freq'],
                                                   otu['pval'],
                                                   otu['corrected_pval'])
