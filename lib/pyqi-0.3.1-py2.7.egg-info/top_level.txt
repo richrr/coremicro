@@ -1,0 +1,11 @@
+pyqi
+pyqi/commands
+pyqi/core
+pyqi/core/interfaces
+pyqi/core/interfaces/html
+pyqi/core/interfaces/optparse
+pyqi/interfaces
+pyqi/interfaces/html
+pyqi/interfaces/html/config
+pyqi/interfaces/optparse
+pyqi/interfaces/optparse/config
