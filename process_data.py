@@ -160,18 +160,6 @@ def compile_results(otus, DELIM):
     return list(set(taxon_list))
 
 
-def convert_shuffled_dict_to_str(DICT, categ):
-    file_str_list = list()
-    file_str = "%s\t%s\n" % ('#SampleID', categ)
-    file_str_list.append(file_str)
-
-    for k, v in DICT.items():
-        for i in v:
-            f_str = "%s\t%s\n" % (i, k)
-            file_str_list.append(f_str)
-    return file_str_list
-
-
 def shuffle_dicts(d):           # takes dictionary
     # If items(), keys(), values() are called with no intervening
     # modifications to the dictionary, the lists will directly correspond.
