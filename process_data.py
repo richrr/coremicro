@@ -1,6 +1,8 @@
 from google.appengine.runtime import DeadlineExceededError
 
-from compute_core_microbiome import exec_core_microb_cmd
+from itertools import compress
+from biom.parse import parse_biom_table
+
 from process_results import ProcessResultsPipeline
 
 import random
@@ -24,11 +26,10 @@ MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
-        data = inputs['data']
-        mapping_file = inputs['mapping_file']
         NTIMES = int(params['ntimes'])
 
-        true_res = run_data(data, mapping_file, params['run_cfgs'])
+        true_res = run_data(inputs['data'], inputs['mapping_dict'],
+                            params['run_cfgs'])
         processing = []
         if NTIMES <= MAX_NUM_PARALLEL:
             pipes = [1 for i in range(NTIMES)]
@@ -40,8 +41,9 @@ class RunPipeline(pipeline.Pipeline):
                 pipes[i] += 1
         logging.info('Starting %d parallel tasks for randomized data',
                      len(pipes))
-        for num_in_task in pipes:
-            res = yield RunRandomDataPipeline(inputs, params, num_in_task)
+        for i in range(len(pipes)):
+            res = yield RunRandomDataPipeline(inputs, params, pipes[i], i + 1,
+                                              len(pipes))
             processing.append(res)
         with pipeline.InOrder():
             yield pipeline.common.Ignore(*processing)
@@ -63,37 +65,38 @@ class RunPipeline(pipeline.Pipeline):
 
 
 class RunRandomDataPipeline(pipeline.Pipeline):
-    def run(self, inputs, params, num):
-        logging.info('Pipeline %s starting run of %d randomizations',
-                     self.pipeline_id, num)
+    def run(self, inputs, params, num, process_id, num_processes):
+        logging.info('Pipeline %d of %d starting run of %d randomizations',
+                     process_id, num_processes, num)
         start = datetime.datetime.now()
         res = {cfg['name']: dict() for cfg in params['run_cfgs']}
         for i in range(num):
             try:
-                logging.info('Pipeline %s running run %d of %d',
-                             self.pipeline_id, i + 1, num)
-                randomized_mapping = convert_shuffled_dict_to_str(
-                    shuffle_dicts(inputs['mapping_dict']), params['factor'])
+                logging.info('Pipeline %d of %d running run %d of %d',
+                             process_id, num_processes, i + 1, num)
+                randomized_mapping = shuffle_dicts(inputs['mapping_dict'])
                 add_result(res, run_data(inputs['data'],
                                          randomized_mapping,
                                          params['run_cfgs']))
                 now = datetime.datetime.now()
                 # assume the next run will take the average of completed runs
                 if ((now - start) * (i + 2)) // (i + 1) > MAX_RUNNING_TIME:
-                    logging.info(
-                        'Pipeline %s starting child process to avoid deadline',
-                        self.pipeline_id)
+                    logging.info('Pipeline %d of %d starting child process ' +
+                                 'to avoid deadline',
+                                 process_id, num_processes)
                     write_random_result(self.root_pipeline_id,
                                         self.pipeline_id, res)
-                    yield RunRandomDataPipeline(inputs, params, num - i - 1)
+                    yield RunRandomDataPipeline(inputs, params, num - i - 1,
+                                                process_id, num_processes)
                     break
             except DeadlineExceededError:
-                logging.info(
-                    'Pipeline %s ran out of time; starting child process',
-                    self.pipeline_id)
+                logging.info('Pipeline %d of %d ran out of time; ' +
+                             'starting child process',
+                             process_id, num_processes)
                 write_random_result(self.root_pipeline_id, self.pipeline_id,
                                     res)
-                yield RunRandomDataPipeline(inputs, params, num - i - 1)
+                yield RunRandomDataPipeline(inputs, params, num - i - 1,
+                                            process_id, num_processes)
                 break
             if i == num - 1:
                 logging.info('Pipeline %s processed all runs',
@@ -114,20 +117,29 @@ def add_result(compiled, result):
 
 def run_data(data, mapping, run_cfgs):
     res = dict()
+    rich_data = parse_biom_table(data)
     for cfg in run_cfgs:
-        raw = exec_core_microb_cmd(data, 'dir', mapping,
-                                   cfg['factor'], cfg['group'])
-        # compile original results. The key is frac_threshold,
-        # value is a list of unique otus
-        compiled = dict()
-        # return the items in sorted order
-        for frac_thresh, core_OTUs_biom in (
-                sorted(raw['frac_thresh_core_OTUs_biom'].items(),
-                       key=lambda (key, value): int(key))):
-            OTUs, biom = core_OTUs_biom  # this is a tuple of otus and biom
-            compiled[frac_thresh] = compile_results(OTUs, cfg['delim'])
-        res[cfg['name']] = compiled
+        res[cfg['name']] = get_core(mapping, rich_data, cfg['group'])
     return res
+
+
+FRACS = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75]
+
+
+def get_core(mapping, data, group):
+    # a table of presence/absence data for just the interest group samples
+    interest = data.filterSamples(lambda values, id, md: id in mapping[group])
+    interest_samples = len(interest.SampleIds)
+    presence_counts = interest.reduce(lambda s, v: s + (v > 0),
+                                      axis='observation')
+    presence_fracs = [float(count) / interest_samples
+                      for count in presence_counts]
+    otus = [observation[2]['taxonomy']
+            for observation in interest.iterObservations()]
+    return {int(frac * 100):
+            list(compress(otus, [presence > frac
+                                 for presence in presence_fracs]))
+            for frac in FRACS}
 
 
 def write_random_result(root_id, run_id, res):
