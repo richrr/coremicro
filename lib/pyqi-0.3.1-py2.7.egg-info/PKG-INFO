@@ -1,0 +1,20 @@
+Metadata-Version: 1.1
+Name: pyqi
+Version: 0.3.1
+Summary: pyqi: expose your interface
+Home-page: http://bipy.github.io/pyqi
+Author: Greg Caporaso
+Author-email: gregcaporaso@gmail.com
+License: BSD
+Description: pyqi (canonically pronounced pie chee) is a Python framework designed to support wrapping general commands in multiple types of interfaces, including at the command line, HTML, and API levels.
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Topic :: Software Development :: Libraries :: Application Frameworks
+Classifier: Topic :: Software Development :: User Interfaces
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Operating System :: OS Independent
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: MacOS :: MacOS X
