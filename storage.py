@@ -1,20 +1,15 @@
 from google.appengine.ext import ndb
-
-
-def clean_storage(key):
-    '''
-    Clean out all storage used with the specified key
-    '''
-    Result_RandomDict.delete_entries(key)
+import logging
 
 
 # for every random dict entry, it has different thresholds
 # the actual key is automatically generated
-class Result_RandomDict(ndb.Model):
+class Results(ndb.Model):
     res = ndb.JsonProperty()
 
     @classmethod
     def add_entry(cls, root_id, run_id, res):
+        logging.info('Writing results from pipeline %s', run_id)
         return cls(parent=ndb.Key(cls, root_id),
                    id=run_id, res=res).put()
 

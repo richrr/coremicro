@@ -10,14 +10,14 @@ import datetime
 import collections
 import logging
 
-from storage import Result_RandomDict, clean_storage
+from storage import Results
 from email_results import send_error_as_email, send_results_as_email
 
 import pipeline
 import pipeline.common
 
 # How many parallel pipes to have processing the randomized data
-MAX_NUM_PARALLEL = 50
+MAX_NUM_PARALLEL = 8
 # If it looks like the task will run longer than this to do another itteration
 # start a new task
 MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
@@ -60,7 +60,7 @@ class RunPipeline(pipeline.Pipeline):
         else:
             attachments = self.outputs.default.value
             send_results_as_email(params, attachments)
-        clean_storage(self.root_pipeline_id)
+            Results.delete_entries(self.root_pipeline_id)
         self.cleanup()
 
 
@@ -75,17 +75,17 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                 logging.info('Pipeline %d of %d running run %d of %d',
                              process_id, num_processes, i + 1, num)
                 randomized_mapping = shuffle_dicts(inputs['mapping_dict'])
-                add_result(res, run_data(inputs['data'],
-                                         randomized_mapping,
-                                         params['run_cfgs']))
+                collate_result(res, run_data(inputs['data'],
+                                             randomized_mapping,
+                                             params['run_cfgs']))
                 now = datetime.datetime.now()
                 # assume the next run will take the average of completed runs
                 if ((now - start) * (i + 2)) // (i + 1) > MAX_RUNNING_TIME:
                     logging.info('Pipeline %d of %d starting child process ' +
                                  'to avoid deadline',
                                  process_id, num_processes)
-                    write_random_result(self.root_pipeline_id,
-                                        self.pipeline_id, res)
+                    Results.add_entry(self.root_pipeline_id,
+                                      self.pipeline_id, res)
                     yield RunRandomDataPipeline(inputs, params, num - i - 1,
                                                 process_id, num_processes)
                     break
@@ -93,20 +93,18 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                 logging.info('Pipeline %d of %d ran out of time; ' +
                              'starting child process',
                              process_id, num_processes)
-                write_random_result(self.root_pipeline_id, self.pipeline_id,
-                                    res)
+                Results.add_entry(self.root_pipeline_id, self.pipeline_id, res)
                 yield RunRandomDataPipeline(inputs, params, num - i - 1,
                                             process_id, num_processes)
                 break
             if i == num - 1:
                 logging.info('Pipeline %s processed all runs',
                              self.pipeline_id)
-                write_random_result(self.root_pipeline_id, self.pipeline_id,
-                                    res)
+                Results.add_entry(self.root_pipeline_id, self.pipeline_id, res)
                 return
 
 
-def add_result(compiled, result):
+def collate_result(compiled, result):
     for cfg in result:
         for threshold, otus in result[cfg].items():
             if threshold in compiled[cfg]:
@@ -140,24 +138,6 @@ def get_core(mapping, data, group):
             list(compress(otus, [presence > frac
                                  for presence in presence_fracs]))
             for frac in FRACS}
-
-
-def write_random_result(root_id, run_id, res):
-    logging.info('Writing results from pipeline %s', run_id)
-    return Result_RandomDict.add_entry(root_id, run_id, res)
-
-
-# get unique elements from last column (otus)
-def compile_results(otus, DELIM):
-    taxon_list = list()         # this may be a json or list
-    result_ = otus              # json.loads(otus)
-    for l in result_:
-        l = l.strip()
-        contents = l.split(DELIM)
-        if '#' in l or not l:
-            continue
-        taxon_list.append(contents[1])
-    return list(set(taxon_list))
 
 
 def shuffle_dicts(d):           # takes dictionary

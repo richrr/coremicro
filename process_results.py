@@ -3,14 +3,14 @@ import logging
 
 from mapreduce.base_handler import PipelineBase
 
-from storage import Result_RandomDict
+from storage import Results
 
 
 class ProcessResultsPipeline(PipelineBase):
     def run(self, params, true_res):
         logging.info('Processing results')
         rand = combine_results(
-            Result_RandomDict.get_entries(self.root_pipeline_id))
+            Results.get_entries(self.root_pipeline_id))
         res = {k: perform_sign_calc(v, rand[k], params)
                for k, v in true_res.iteritems()}
         return get_attachments(res, params)
