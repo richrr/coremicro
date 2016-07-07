@@ -64,6 +64,17 @@
           </p>
         </div>
         <div class="form-group">
+          <label for="random_opt">Randomization Type</label><br>
+          <input type="radio" name="random_opt" value="samp_annot" checked>Sample Annotation<br>
+          <input type="radio" name="random_opt" value="row_wise">Row Wise<br>
+          <input type="radio" name="random_opt" value="column_wise">Column Wise<br>
+          <input type="radio" name="random_opt" value="otu_label">OTU Label<br>
+          <p class="help-block">
+            How to randomize the data
+          </p>
+        </div>
+        
+        <div class="form-group">
           <label for="fvaldjmethod"><i>p</i>-value adjustment method</label><br>
 	  <input type="radio" name="pvaladjmethod" value="bf"> Bonferroni<br>
 	  <input type="radio" name="pvaladjmethod" value="bh" checked> Benjamini Hochberg<br>

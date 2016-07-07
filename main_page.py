@@ -28,6 +28,7 @@ class MainPage(webapp2.RequestHandler):
 
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
+        random_opt = self.request.get('random_opt')
 
         to_email = self.request.get('email')
 
@@ -48,6 +49,7 @@ class MainPage(webapp2.RequestHandler):
             'timestamp': timestamp,
             'user_args': user_args,
             'include_out': include_out,
+            'random_opt': random_opt,
         }
 
         inputs = {
@@ -124,6 +126,10 @@ def validate_inputs(params, inputs):
     else:
         groups.remove(group)
         out_group = groups[0]
+
+    if params['random_opt'] not in ['row_wise', 'column_wise',
+                                    'otu_label', 'samp_annot']:
+        errors_list.append('Randomization option not valid')
     return (errors_list, mapping_dict, out_group)
 
 

@@ -27,7 +27,7 @@
         <ol>
 	  <li><a href="#input_files">Input files</a></li>
 	  <li><a href="#options">Options</a></li>
-          <li><a href="#outputs">Output Files</a><li>
+          <li><a href="#outputs">Output Files</a></li>
 	  <li><a href="#method">Method details</a></li>
           <li><a href="#sample_data">Sample Data</a></li>
 	  <li><a href="#faq">FAQs</a></li>
@@ -123,6 +123,15 @@
           <dt>Number of randomizations</dt>
           <dd>Used to estimate the significance of core OTUs. Please keep this number greater
             than 500 and less than a 1500. 1000 is a good default.</dd>
+          <dt>Randomization Type</dt>
+          <dd>
+            How to randomize the data
+            <ul>
+              <li>Sample Annotation: Keeps the data table and otu labels the same, only shuffles the sample annotations (default)</li>
+              <li>Row Wise: For each row (otu), shuffles the numbers</li>
+              <li>Column Wise: For each column (sample), shuffles the numbers</li>
+              <li>OTU Label: Keeps the data table and sample annotation the same, only shuffles the otu taxonomies</li>
+            </ul>
           <dt><i>p</i>-value adjustment method</dt>
           <dd>To correct for multiple testings of OTUs. Benjamini Hochberg is a good default.</dd>
           <dt>Email</dt>

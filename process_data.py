@@ -5,13 +5,13 @@ from biom.parse import parse_biom_table
 
 from process_results import ProcessResultsPipeline
 
-import random
 import datetime
 import collections
 import logging
 
 from storage import Results
 from email_results import send_error_as_email, send_results_as_email
+from randomize_data import randomize
 
 import pipeline
 import pipeline.common
@@ -28,7 +28,8 @@ class RunPipeline(pipeline.Pipeline):
         logging.info('Starting run')
         NTIMES = int(params['ntimes'])
 
-        true_res = run_data(inputs['data'], inputs['mapping_dict'],
+        true_res = run_data(inputs['mapping_dict'],
+                            parse_biom_table(inputs['data']),
                             params['run_cfgs'])
         processing = []
         if NTIMES <= MAX_NUM_PARALLEL:
@@ -70,13 +71,15 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                      process_id, num_processes, num)
         start = datetime.datetime.now()
         res = {cfg['name']: dict() for cfg in params['run_cfgs']}
+        parsed_data = parse_biom_table(inputs['data'])
         for i in range(num):
             try:
                 logging.info('Pipeline %d of %d running run %d of %d',
                              process_id, num_processes, i + 1, num)
-                randomized_mapping = shuffle_dicts(inputs['mapping_dict'])
-                collate_result(res, run_data(inputs['data'],
-                                             randomized_mapping,
+                random_mapping, random_data = randomize(inputs['mapping_dict'],
+                                                        parsed_data,
+                                                        params['random_opt'])
+                collate_result(res, run_data(random_mapping, random_data,
                                              params['run_cfgs']))
                 now = datetime.datetime.now()
                 # assume the next run will take the average of completed runs
@@ -113,11 +116,10 @@ def collate_result(compiled, result):
                 compiled[cfg][threshold] = collections.Counter(otus)
 
 
-def run_data(data, mapping, run_cfgs):
+def run_data(mapping, data, run_cfgs):
     res = dict()
-    rich_data = parse_biom_table(data)
     for cfg in run_cfgs:
-        res[cfg['name']] = get_core(mapping, rich_data, cfg['group'])
+        res[cfg['name']] = get_core(mapping, data, cfg['group'])
     return res
 
 
@@ -138,28 +140,3 @@ def get_core(mapping, data, group):
             list(compress(otus, [presence > frac
                                  for presence in presence_fracs]))
             for frac in FRACS}
-
-
-def shuffle_dicts(d):           # takes dictionary
-    # If items(), keys(), values() are called with no intervening
-    # modifications to the dictionary, the lists will directly correspond.
-    keys = d.keys()
-    values, lengths = get_values_from_dict(d)
-    random.shuffle(values)
-    new_values = divide_list(values, lengths)
-    return dict(zip(keys, new_values))
-
-
-# this can be changed later to allow splitting in more than two groups
-def divide_list(a, lengths):
-    # a[start:end] # items start through end-1
-    return a[:lengths[0]], a[lengths[0]:]
-
-
-def get_values_from_dict(a):
-    values = list()
-    lengths = list()
-    for v in a.values():
-        values.extend(v)
-        lengths.append(len(v))  # sizes of original lists
-    return values, lengths
