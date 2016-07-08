@@ -4,22 +4,28 @@ import logging
 from mapreduce.base_handler import PipelineBase
 
 from storage import Results
+from generate_graph import generate_graph
 
 
 class ProcessResultsPipeline(PipelineBase):
-    def run(self, params, true_res):
+    def run(self, params, inputs, true_res):
         logging.info('Processing results')
         rand = combine_results(
             Results.get_entries(self.root_pipeline_id))
         res = {k: perform_sign_calc(v, rand[k], params)
                for k, v in true_res.iteritems()}
-        return get_attachments(res, params)
+        attachments = list()
+        attachments += format_results(res, params)
+        attachments += generate_graph(params, inputs, res)
+        return attachments
 
 
-def get_attachments(res, params):
+def get_attachments(res, graphs, params):
     attachments = [('%s_results_%s.tsv' % (k, params['name']),
                     format_results(v, params['p_val_adj']))
                    for k, v in res.iteritems()]
+    attachments += [('%s_plot_%s.svg' % (k, params['name']), v)
+                    for k, v in graphs.iteritems()]
     return attachments
 
 
@@ -35,17 +41,22 @@ def combine_results(results):
     return combined
 
 
-def format_results(results, p_val_adj):
-    sign_results = (('Significant results:\nOTU\tFreq. in randomized ' +
-                     'data\tpval=freq/times randomized\t%s corrected pval\n')
-                    % p_val_adj)
-    for frac in sorted(map(int, results.keys())):
-        sign_results += '\n#Frac thresh %s\n' % str(frac)
-        for otu in results[str(frac)]:
-            sign_results += '%s\t%s\t%s\t%s\n' % (otu['otu'], otu['freq'],
-                                                  otu['pval'],
-                                                  otu['corrected_pval'])
-    return sign_results
+def format_results(res, params):
+    attachments = list()
+    for cfg in res:
+        sign_results = (('Significant results:\nOTU\tFreq. in randomized ' +
+                         'data\tpval=freq/times randomized\t%s ' +
+                         'corrected pval\n')
+                        % params['p_val_adj'])
+        for frac in sorted(map(int, res[cfg].keys())):
+            sign_results += '\n#Frac thresh %s\n' % str(frac)
+            for otu in res[cfg][str(frac)]:
+                sign_results += '%s\t%s\t%s\t%s\n' % (otu['otu'], otu['freq'],
+                                                      otu['pval'],
+                                                      otu['corrected_pval'])
+        attachments.append(('%s_results_%s.tsv' % (cfg, params['name']),
+                            sign_results))
+    return attachments
 
 
 def perform_sign_calc(true_result_frac_thresh_otus_dict,
@@ -77,6 +88,7 @@ def perform_sign_calc(true_result_frac_thresh_otus_dict,
 
         # check if there is at least one significant entry so far:
         if len(signif_core_microb_otu_dict) == 0:
+            logging.info('There are no signif core microb without corrections')
             continue            # go to next iteration
         else:
             logging.info('There are %s signif core microb without corrections'

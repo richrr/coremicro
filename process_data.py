@@ -48,7 +48,7 @@ class RunPipeline(pipeline.Pipeline):
             processing.append(res)
         with pipeline.InOrder():
             yield pipeline.common.Ignore(*processing)
-            yield ProcessResultsPipeline(params, true_res)
+            yield ProcessResultsPipeline(params, inputs, true_res)
 
     def finalized(self):
         logging.info('Finalizing task')
