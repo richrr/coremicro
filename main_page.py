@@ -67,7 +67,7 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': group,
                 'delim': DELIM,
-                'name': 'core'
+                'name': 'interest'
             }
         ]
 

@@ -1,78 +1,83 @@
 from biom.parse import parse_biom_table
 import StringIO
-import numpy
 import matplotlib.pyplot as plt
+import numpy
 
 
 def generate_graph(params, inputs, results):
     mapping = inputs['mapping_dict']
     data = parse_biom_table(inputs['data'])
-    all_otus = {k: get_otus_list(results[k]) for k in results}
     attachments = list()
     cfg_to_group = {cfg['name']: cfg['group'] for cfg in params['run_cfgs']}
-    for cfg in all_otus:
-        otus = all_otus[cfg]
-        group = cfg_to_group[cfg]
-        # Filter down to core otus
-        interest = data.filterObservations(lambda values, id, md:
+    for cfg in results:
+        for frac in results[cfg]:
+            otus = [res['otu'] for res in results[cfg][frac]]
+            group = cfg_to_group[cfg]
+            # Filter down to core otus
+            core = data.filterObservations(lambda values, id, md:
                                            md['taxonomy'] in otus)
-        core_interest = interest.filterSamples(lambda values, id, md:
+            interest_core = core.filterSamples(lambda values, id, md:
                                                id in mapping[group])
-        core_interest_samples = len(core_interest.SampleIds)
-        core_averages = [float(total) / core_interest_samples
-                         for total in core_interest.sum(axis='observation')]
-        core_frequencies = core_interest.reduce(lambda s, v: s + (v > 0),
-                                                axis='observation')
-        out_interest = interest.filterSamples(lambda values, id, md:
-                                              id not in mapping[group])
-        out_interest_samples = len(out_interest.SampleIds)
-        out_averages = [float(total) / out_interest_samples
-                        for total in out_interest.sum(axis='observation')]
-        out_frequencies = out_interest.reduce(lambda s, v: s + (v > 0),
-                                              axis='observation')
+            interest_core_samples = len(interest_core.SampleIds)
+            interest_averages = [float(total) / interest_core_samples
+                                 for total in interest_core.sum(
+                                         axis='observation')]
+            interest_frequencies = interest_core.transformSamples(
+                lambda l, id, md: numpy.array([v > 0 for v in l])
+            ).sum(axis='observation')
+            out_core = core.filterSamples(lambda values, id, md:
+                                          id not in mapping[group])
+            out_core_samples = len(out_core.SampleIds)
+            out_averages = [float(total) / out_core_samples
+                            for total in out_core.sum(axis='observation')]
+            out_frequencies = out_core.transformSamples(
+                lambda l, id, md: numpy.array([v > 0 for v in l])
+            ).sum(axis='observation')
 
-        # OTUs in the same order as the averages
-        ordered_otus = [observation[2]['taxonomy']
-                        for observation in interest.iterObservations()]
-        ordered_ids = [observation[1]
-                       for observation in interest.iterObservations()]
+            # OTUs in the same order as the averages
+            ordered_otus = [observation[2]['taxonomy']
+                            for observation in core.iterObservations()]
+            ordered_ids = [observation[1]
+                           for observation in core.iterObservations()]
 
-        width = 0.35
-        ind = range(len(otus))
+            # Sort everything by decreasing frequency in interest group
+            interest_averages, interest_frequencies, out_averages, \
+                out_frequencies, ordered_ids, ordered_otus \
+                = zip(*reversed(sorted(zip(
+                    interest_averages, interest_frequencies,
+                    out_averages, out_frequencies,
+                    ordered_ids, ordered_otus))))
 
-        fig, ax = plt.subplots()
+            width = 0.35
+            ind = [i + width/2 for i in range(len(otus))]
 
-        core = ax.bar(ind, core_averages, width, color='r')
-        out = ax.bar([i + width for i in ind], out_averages, width, color='y')
-        ax.set_ylabel('Average Presence')
-        ax.set_xlabel('Sample ID')
-        ax.set_xticks([i + width for i in ind])
-        ax.set_xticklabels(ordered_ids, rotation='vertical')
-        ax.legend((core[0], out[0]), ('Core', 'Out'))
+            interest = plt.bar(ind, interest_averages, width, color='r')
+            out = plt.bar([i + width for i in ind], out_averages, width,
+                          color='y')
+            plt.ylabel('Average Abundance')
+            plt.xlabel('Sample ID')
+            plt.xticks([i + width for i in ind], ordered_ids)
+            plt.legend((interest[0], out[0]), ('Interest', 'Out'))
+            plt.title('Abundance of Core Microbes at %s%% Threshold' % frac)
 
-        out = StringIO.StringIO()
-        plt.savefig(out, format='svg')
-        attachments.append(('%s_plot_%s.svg' % (cfg, params['name']),
-                            out.getvalue()))
+            out = StringIO.StringIO()
+            plt.savefig(out, format='svg')
+            attachments.append(('%s_plot_%s_%s.svg' % (cfg, frac,
+                                                       params['name']),
+                                out.getvalue()))
 
-        ref_text = 'ID\tCore Frequency\tOut Frequency\tOTU\n'
-        for i in range(len(otus)):
-            ref_text += '%s\t%d of %d\t%d of %d\t%s\n' % (
-                ordered_ids[i],
-                core_frequencies[i],
-                core_interest_samples,
-                out_frequencies[i],
-                out_interest_samples,
-                ordered_otus[i])
+            ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
+            for i in range(len(otus)):
+                ref_text += '%s\t%d of %d\t%d of %d\t%s\n' % (
+                    ordered_ids[i],
+                    interest_frequencies[i],
+                    interest_core_samples,
+                    out_frequencies[i],
+                    out_core_samples,
+                    ordered_otus[i])
 
-        attachments.append(('%s_plot_labels_%s.tsv' % (cfg, params['name']),
-                            ref_text))
-        plt.clf()
+            attachments.append(('%s_plot_labels_%s_%s.tsv' %
+                                (cfg, frac, params['name']),
+                                ref_text))
+            plt.clf()
     return attachments
-
-
-def get_otus_list(res):
-    otus_list = []
-    for frac in res:
-        otus_list += map(lambda d: d['otu'], res[frac])
-    return list(set(otus_list))
