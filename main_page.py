@@ -66,6 +66,7 @@ class MainPage(webapp2.RequestHandler):
             {
                 'factor': factor,
                 'group': group,
+                'out_group': out_group,
                 'delim': DELIM,
                 'name': 'interest'
             }
@@ -75,6 +76,7 @@ class MainPage(webapp2.RequestHandler):
             params['run_cfgs'].append({
                 'factor': factor,
                 'group': out_group,
+                'out_group': group,
                 'delim': DELIM,
                 'name': 'out'
                 }

@@ -57,7 +57,9 @@ def generate_graph(params, inputs, results):
             plt.ylabel('Average Abundance')
             plt.xlabel('Sample ID')
             plt.xticks([i + width for i in ind], ordered_ids)
-            plt.legend((interest[0], out[0]), ('Interest', 'Out'))
+            config = [c for c in params['run_cfgs'] if c['name'] == cfg][0]
+            plt.legend((interest[0], out[0]), (config['group'],
+                                               config['out_group']))
             plt.title('Abundance of Core Microbes at %s%% Threshold' % frac)
 
             out = StringIO.StringIO()
