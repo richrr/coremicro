@@ -12,6 +12,8 @@ def generate_graph(params, inputs, results):
     for cfg in results:
         for frac in results[cfg]:
             otus = [res['otu'] for res in results[cfg][frac]]
+            if len(otus) == 0:
+                continue
             group = cfg_to_group[cfg]
             # Filter down to core otus
             core = data.filterObservations(lambda values, id, md:
