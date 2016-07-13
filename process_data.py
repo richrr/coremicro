@@ -8,6 +8,7 @@ from process_results import ProcessResultsPipeline
 import datetime
 import collections
 import logging
+import numpy
 
 from storage import Results
 from email_results import send_error_as_email, send_results_as_email
@@ -130,13 +131,14 @@ def get_core(mapping, data, group):
     # a table of presence/absence data for just the interest group samples
     interest = data.filterSamples(lambda values, id, md: id in mapping[group])
     interest_samples = len(interest.SampleIds)
-    presence_counts = interest.reduce(lambda s, v: s + (v > 0),
-                                      axis='observation')
+    presence_counts = interest.transformSamples(
+        lambda l, id, md: numpy.array([v > 0 for v in l])
+    ).sum(axis='observation')
     presence_fracs = [float(count) / interest_samples
                       for count in presence_counts]
     otus = [observation[2]['taxonomy']
             for observation in interest.iterObservations()]
     return {int(frac * 100):
-            list(compress(otus, [presence > frac
+            list(compress(otus, [presence >= frac
                                  for presence in presence_fracs]))
             for frac in FRACS}
