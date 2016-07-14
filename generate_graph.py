@@ -20,42 +20,48 @@ def generate_graph(params, inputs, results):
                                            md['taxonomy'] in otus)
             interest_core = core.filterSamples(lambda values, id, md:
                                                id in mapping[group])
-            interest_core_samples = len(interest_core.SampleIds)
-            interest_averages = [float(total) / interest_core_samples
-                                 for total in interest_core.sum(
-                                         axis='observation')]
-            interest_frequencies = interest_core.transformSamples(
-                lambda l, id, md: numpy.array([v > 0 for v in l])
-            ).sum(axis='observation')
             out_core = core.filterSamples(lambda values, id, md:
                                           id not in mapping[group])
+            interest_core_samples = len(interest_core.SampleIds)
             out_core_samples = len(out_core.SampleIds)
-            out_averages = [float(total) / out_core_samples
-                            for total in out_core.sum(axis='observation')]
-            out_frequencies = out_core.transformSamples(
-                lambda l, id, md: numpy.array([v > 0 for v in l])
-            ).sum(axis='observation')
 
-            # OTUs in the same order as the averages
-            ordered_otus = [observation[2]['taxonomy']
-                            for observation in core.iterObservations()]
-            ordered_ids = [observation[1]
-                           for observation in core.iterObservations()]
+            ordered_otus = []
+            ordered_ids = []
+
+            interest_averages = []
+            interest_frequencies = []
+            interest_errors = []
+            for vals, id, md in interest_core.iterObservations():
+                ordered_otus.append(md['taxonomy'])
+                ordered_ids.append(id)
+                interest_averages.append(numpy.mean(vals))
+                interest_frequencies.append(numpy.count_nonzero(vals))
+                interest_errors.append(standard_error(vals))
+
+            out_averages = []
+            out_frequencies = []
+            out_errors = []
+            for vals, id, md in out_core.iterObservations():
+                out_averages.append(numpy.mean(vals))
+                out_frequencies.append(numpy.count_nonzero(vals))
+                out_errors.append(standard_error(vals))
 
             # Sort everything by decreasing frequency in interest group
-            interest_averages, interest_frequencies, out_averages, \
-                out_frequencies, ordered_ids, ordered_otus \
+            interest_averages, interest_frequencies, interest_errors, \
+                out_averages, out_frequencies, out_errors, \
+                ordered_ids, ordered_otus \
                 = zip(*reversed(sorted(zip(
-                    interest_averages, interest_frequencies,
-                    out_averages, out_frequencies,
+                    interest_averages, interest_frequencies, interest_errors,
+                    out_averages, out_frequencies, out_errors,
                     ordered_ids, ordered_otus))))
 
             width = 0.35
             ind = [i + width/2 for i in range(len(otus))]
 
-            interest = plt.bar(ind, interest_averages, width, color='r')
+            interest = plt.bar(ind, interest_averages, width, color='r',
+                               yerr=interest_errors)
             out = plt.bar([i + width for i in ind], out_averages, width,
-                          color='y')
+                          color='y', yerr=out_errors)
             plt.ylabel('Average Abundance')
             plt.xlabel('Sample ID')
             plt.xticks([i + width for i in ind], ordered_ids)
@@ -85,3 +91,7 @@ def generate_graph(params, inputs, results):
                                 ref_text))
             plt.clf()
     return attachments
+
+
+def standard_error(a):
+    return numpy.std(a, ddof=1)/numpy.sqrt(len(a))
