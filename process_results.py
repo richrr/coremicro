@@ -1,13 +1,13 @@
 import collections
 import logging
 
-from mapreduce.base_handler import PipelineBase
+import pipeline
 
 from storage import Results
 from generate_graph import generate_graph
 
 
-class ProcessResultsPipeline(PipelineBase):
+class ProcessResultsPipeline(pipeline.Pipeline):
     def run(self, params, inputs, true_res):
         logging.info('Processing results')
         rand = combine_results(
