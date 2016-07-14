@@ -1,7 +1,14 @@
 from biom.parse import parse_biom_table
 import StringIO
-import matplotlib.pyplot as plt
+import os
 import numpy
+import logging
+
+# matplotlib can't be run on the development server
+IS_NOT_DEVELOPMENT = os.getenv('SERVER_SOFTWARE',
+                               '').startswith('Google App Engine/')
+if IS_NOT_DEVELOPMENT:
+    import matplotlib.pyplot as plt
 
 
 def generate_graph(params, inputs, results):
@@ -57,24 +64,29 @@ def generate_graph(params, inputs, results):
 
             width = 0.35
             ind = [i + width/2 for i in range(len(otus))]
+            if IS_NOT_DEVELOPMENT:
+                interest = plt.bar(ind, interest_averages, width, color='r',
+                                   yerr=interest_errors)
+                out = plt.bar([i + width for i in ind], out_averages, width,
+                              color='y', yerr=out_errors)
+                plt.ylabel('Average Abundance')
+                plt.xlabel('Sample ID')
+                plt.xticks([i + width for i in ind], ordered_ids)
+                config = [c for c in params['run_cfgs'] if c['name'] == cfg][0]
+                plt.legend((interest[0], out[0]), (config['group'],
+                                                   config['out_group']))
+                plt.title('Abundance of Core Microbes at %s%% Threshold' %
+                          frac)
 
-            interest = plt.bar(ind, interest_averages, width, color='r',
-                               yerr=interest_errors)
-            out = plt.bar([i + width for i in ind], out_averages, width,
-                          color='y', yerr=out_errors)
-            plt.ylabel('Average Abundance')
-            plt.xlabel('Sample ID')
-            plt.xticks([i + width for i in ind], ordered_ids)
-            config = [c for c in params['run_cfgs'] if c['name'] == cfg][0]
-            plt.legend((interest[0], out[0]), (config['group'],
-                                               config['out_group']))
-            plt.title('Abundance of Core Microbes at %s%% Threshold' % frac)
-
-            out = StringIO.StringIO()
-            plt.savefig(out, format='svg')
-            attachments.append(('%s_plot_%s_%s.svg' % (cfg, frac,
-                                                       params['name']),
-                                out.getvalue()))
+                out = StringIO.StringIO()
+                plt.savefig(out, format='svg')
+                attachments.append(('%s_plot_%s_%s.svg' % (cfg, frac,
+                                                           params['name']),
+                                    out.getvalue()))
+                plt.clf()
+            else:
+                logging.warn('Not generating graphs because matplotlib ' +
+                             'does not work in development')
 
             ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
             for i in range(len(otus)):
@@ -89,7 +101,6 @@ def generate_graph(params, inputs, results):
             attachments.append(('%s_plot_labels_%s_%s.tsv' %
                                 (cfg, frac, params['name']),
                                 ref_text))
-            plt.clf()
     return attachments
 
 
