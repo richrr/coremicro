@@ -1,11 +1,10 @@
 import webapp2
-
-from time import localtime, strftime
-
 import sys
+from time import localtime, strftime
 
 from email_results import send_error_as_email
 from process_data import RunPipeline
+import run_config
 
 
 class MainPage(webapp2.RequestHandler):
@@ -21,7 +20,6 @@ class MainPage(webapp2.RequestHandler):
         data = self.request.get('datafile')
         mapping_file = self.request.get('groupfile').split('\n')
 
-        DELIM = '\t'
         factor, group = self.request.get('group').split(':')
         NTIMES = int(self.request.get('random'))
         timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
@@ -43,7 +41,6 @@ class MainPage(webapp2.RequestHandler):
             'factor': factor,
             'group': group,
             'p_val_adj': p_val_adj,
-            'delim': DELIM,
             'ntimes': str(NTIMES),
             'to_email': to_email,
             'timestamp': timestamp,
@@ -67,7 +64,6 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': group,
                 'out_group': out_group,
-                'delim': DELIM,
                 'name': 'interest'
             }
         ]
@@ -77,7 +73,6 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': out_group,
                 'out_group': group,
-                'delim': DELIM,
                 'name': 'out'
                 }
             )
@@ -96,11 +91,10 @@ class MainPage(webapp2.RequestHandler):
 
 def validate_inputs(params, inputs):
     mapping_file = inputs['mapping_file']
-    DELIM = params['delim']
     factor = params['factor']
     group = params['group']
 
-    labels = mapping_file[0].strip().strip('#').split(DELIM)
+    labels = mapping_file[0].strip().strip('#').split(run_config.DELIM)
     indx_sampleid = indx_categ = 0
 
     errors_list = list()
@@ -115,8 +109,8 @@ def validate_inputs(params, inputs):
     else:
         errors_list.append(('"%s" not in the headers of the sample <-> ' +
                             'group info file') % factor)
-    mapping_dict = get_categ_samples_dict(mapping_file, DELIM,
-                                          indx_categ, indx_sampleid)
+    mapping_dict = get_categ_samples_dict(mapping_file, indx_categ,
+                                          indx_sampleid)
     groups = mapping_dict.keys()
     if (len(groups) != 2):
         errors_list.append('Following code divides samples ' +
@@ -135,13 +129,12 @@ def validate_inputs(params, inputs):
     return (errors_list, mapping_dict, out_group)
 
 
-def get_categ_samples_dict(mapping_info_list, DELIM, index_categ,
-                           indx_sampleid):
+def get_categ_samples_dict(mapping_info_list, index_categ, indx_sampleid):
     local_dict = dict()
     for l in mapping_info_list:
         if not l or l.strip()[0] == '#':
             continue
-        key, val = map(l.strip().split(DELIM).__getitem__,
+        key, val = map(l.strip().split(run_config.DELIM).__getitem__,
                        [index_categ, indx_sampleid])
         if key in local_dict:
             local_dict[key].append(val)

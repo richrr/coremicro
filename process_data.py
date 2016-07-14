@@ -13,32 +13,28 @@ import numpy
 from storage import Results
 from email_results import send_error_as_email, send_results_as_email
 from randomize_data import randomize
+import run_config
 
 import pipeline
 import pipeline.common
-
-# How many parallel pipes to have processing the randomized data
-MAX_NUM_PARALLEL = 8
-# If it looks like the task will run longer than this to do another itteration
-# start a new task
-MAX_RUNNING_TIME = datetime.timedelta(minutes=9)
 
 
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
-        NTIMES = int(params['ntimes'])
+        ntimes = int(params['ntimes'])
 
         true_res = run_data(inputs['mapping_dict'],
                             parse_biom_table(inputs['data']),
                             params['run_cfgs'])
         processing = []
-        if NTIMES <= MAX_NUM_PARALLEL:
-            pipes = [1 for i in range(NTIMES)]
+        if ntimes <= run_config.MAX_NUM_PARALLEL:
+            pipes = [1 for i in range(ntimes)]
         else:
             # list of number of times to run in each pipe
-            pipes = [NTIMES/MAX_NUM_PARALLEL for i in range(MAX_NUM_PARALLEL)]
-            left_over = NTIMES % MAX_NUM_PARALLEL
+            pipes = [ntimes/run_config.MAX_NUM_PARALLEL
+                     for i in range(run_config.MAX_NUM_PARALLEL)]
+            left_over = ntimes % run_config.MAX_NUM_PARALLEL
             for i in range(left_over):
                 pipes[i] += 1
         logging.info('Starting %d parallel tasks for randomized data',
@@ -84,7 +80,8 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                                              params['run_cfgs']))
                 now = datetime.datetime.now()
                 # assume the next run will take the average of completed runs
-                if ((now - start) * (i + 2)) // (i + 1) > MAX_RUNNING_TIME:
+                if ((now - start) * (i + 2)) // (i + 1) > \
+                   run_config.MAX_RUNNING_TIME:
                     logging.info('Pipeline %d of %d starting child process ' +
                                  'to avoid deadline',
                                  process_id, num_processes)
@@ -124,9 +121,6 @@ def run_data(mapping, data, run_cfgs):
     return res
 
 
-FRACS = [1.0, 0.95, 0.9, 0.85, 0.8, 0.75]
-
-
 def get_core(mapping, data, group):
     # a table of presence/absence data for just the interest group samples
     interest = data.filterSamples(lambda values, id, md: id in mapping[group])
@@ -141,4 +135,4 @@ def get_core(mapping, data, group):
     return {int(frac * 100):
             list(compress(otus, [presence >= frac
                                  for presence in presence_fracs]))
-            for frac in FRACS}
+            for frac in run_config.FRACS}

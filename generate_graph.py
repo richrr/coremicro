@@ -1,13 +1,12 @@
 from biom.parse import parse_biom_table
 import StringIO
-import os
 import numpy
 import logging
 
+import run_config
+
 # matplotlib can't be run on the development server
-IS_NOT_DEVELOPMENT = os.getenv('SERVER_SOFTWARE',
-                               '').startswith('Google App Engine/')
-if IS_NOT_DEVELOPMENT:
+if run_config.IS_PRODUCTION:
     import matplotlib.pyplot as plt
 
 
@@ -64,7 +63,7 @@ def generate_graph(params, inputs, results):
 
             width = 0.35
             ind = [i + width/2 for i in range(len(otus))]
-            if IS_NOT_DEVELOPMENT:
+            if run_config.IS_PRODUCTION:
                 interest = plt.bar(ind, interest_averages, width, color='r',
                                    yerr=interest_errors)
                 out = plt.bar([i + width for i in ind], out_averages, width,
@@ -84,9 +83,6 @@ def generate_graph(params, inputs, results):
                                                            params['name']),
                                     out.getvalue()))
                 plt.clf()
-            else:
-                logging.warn('Not generating graphs because matplotlib ' +
-                             'does not work in development')
 
             ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
             for i in range(len(otus)):
@@ -101,6 +97,8 @@ def generate_graph(params, inputs, results):
             attachments.append(('%s_plot_labels_%s_%s.tsv' %
                                 (cfg, frac, params['name']),
                                 ref_text))
+    if not run_config.IS_PRODUCTION:
+        logging.warn('Graphs not generated because in development mode')
     return attachments
 
 
