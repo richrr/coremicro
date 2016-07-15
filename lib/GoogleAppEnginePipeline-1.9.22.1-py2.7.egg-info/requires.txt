@@ -1,4 +1,0 @@
-GoogleAppEngineCloudStorageClient >= 1.9.22
-
-[python2.5]
-simplejson >= 3.6.5
