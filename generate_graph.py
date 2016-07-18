@@ -1,8 +1,8 @@
-from biom.parse import parse_biom_table
 import StringIO
 import numpy
 import logging
 
+from read_table import read_table
 import run_config
 
 # matplotlib can't be run on the development server
@@ -12,7 +12,7 @@ if run_config.IS_PRODUCTION:
 
 def generate_graph(params, inputs, results):
     mapping = inputs['mapping_dict']
-    data = parse_biom_table(inputs['data'])
+    data = read_table(inputs['data'])
     attachments = list()
     cfg_to_group = {cfg['name']: cfg['group'] for cfg in params['run_cfgs']}
     for cfg in results:
@@ -23,7 +23,9 @@ def generate_graph(params, inputs, results):
             group = cfg_to_group[cfg]
             # Filter down to core otus
             core = data.filterObservations(lambda values, id, md:
-                                           md['taxonomy'] in otus)
+                                           id in otus)
+            for val, id, md in core.iterObservations():
+                print id
             interest_core = core.filterSamples(lambda values, id, md:
                                                id in mapping[group])
             out_core = core.filterSamples(lambda values, id, md:
@@ -32,14 +34,12 @@ def generate_graph(params, inputs, results):
             out_core_samples = len(out_core.SampleIds)
 
             ordered_otus = []
-            ordered_ids = []
 
             interest_averages = []
             interest_frequencies = []
             interest_errors = []
             for vals, id, md in interest_core.iterObservations():
-                ordered_otus.append(md['taxonomy'])
-                ordered_ids.append(id)
+                ordered_otus.append(id)
                 interest_averages.append(numpy.mean(vals))
                 interest_frequencies.append(numpy.count_nonzero(vals))
                 interest_errors.append(standard_error(vals))
@@ -55,11 +55,11 @@ def generate_graph(params, inputs, results):
             # Sort everything by decreasing frequency in interest group
             interest_averages, interest_frequencies, interest_errors, \
                 out_averages, out_frequencies, out_errors, \
-                ordered_ids, ordered_otus \
+                ordered_otus \
                 = zip(*reversed(sorted(zip(
                     interest_averages, interest_frequencies, interest_errors,
                     out_averages, out_frequencies, out_errors,
-                    ordered_ids, ordered_otus))))
+                    ordered_otus))))
 
             width = 0.35
             ind = [i + width/2 for i in range(len(otus))]
@@ -70,7 +70,7 @@ def generate_graph(params, inputs, results):
                               color='y', yerr=out_errors)
                 plt.ylabel('Average Abundance')
                 plt.xlabel('Sample ID')
-                plt.xticks([i + width for i in ind], ordered_ids)
+                plt.xticks([i + width for i in ind], range(len(ordered_otus)))
                 config = [c for c in params['run_cfgs'] if c['name'] == cfg][0]
                 plt.legend((interest[0], out[0]), (config['group'],
                                                    config['out_group']))
@@ -87,7 +87,7 @@ def generate_graph(params, inputs, results):
             ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
             for i in range(len(otus)):
                 ref_text += '%s\t%d of %d\t%d of %d\t%s\n' % (
-                    ordered_ids[i],
+                    i,
                     interest_frequencies[i],
                     interest_core_samples,
                     out_frequencies[i],

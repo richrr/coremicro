@@ -1,7 +1,6 @@
 from google.appengine.runtime import DeadlineExceededError
 
 from itertools import compress
-from biom.parse import parse_biom_table
 
 from process_results import ProcessResultsPipeline
 
@@ -13,6 +12,7 @@ import numpy
 from storage import Results
 from email_results import send_error_as_email, send_results_as_email
 from randomize_data import randomize
+from read_table import read_table
 import run_config
 
 import pipeline
@@ -25,7 +25,7 @@ class RunPipeline(pipeline.Pipeline):
         ntimes = int(params['ntimes'])
 
         true_res = run_data(inputs['mapping_dict'],
-                            parse_biom_table(inputs['data']),
+                            read_table(inputs['data']),
                             params['run_cfgs'])
         processing = []
         if ntimes <= run_config.MAX_NUM_PARALLEL:
@@ -68,7 +68,8 @@ class RunRandomDataPipeline(pipeline.Pipeline):
                      process_id, num_processes, num)
         start = datetime.datetime.now()
         res = {cfg['name']: dict() for cfg in params['run_cfgs']}
-        parsed_data = parse_biom_table(inputs['data'])
+        parsed_data = read_table(inputs['data'])
+
         for i in range(num):
             try:
                 logging.info('Pipeline %d of %d running run %d of %d',
@@ -130,8 +131,7 @@ def get_core(mapping, data, group):
     ).sum(axis='observation')
     presence_fracs = [float(count) / interest_samples
                       for count in presence_counts]
-    otus = [observation[2]['taxonomy']
-            for observation in interest.iterObservations()]
+    otus = [observation[1] for observation in interest.iterObservations()]
     return {int(frac * 100):
             list(compress(otus, [presence >= frac
                                  for presence in presence_fracs]))

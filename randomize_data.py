@@ -29,15 +29,14 @@ def column_wise(mapping, data):
 
 
 def otu_label(mapping, data):
-    ids = []
+    otus = []
     metadata = []
-    for observation in data.iterObservations():
-        obs_value, obs_id, obs_metadata = observation
-        ids.append(obs_id)
+    for obs_value, obs_id, obs_metadata in data.iterObservations():
+        otus.append(obs_id)
         metadata.append(obs_metadata)
     relabled_data = data.copy()
-    relabled_data.addObservationMetadata(dict(zip(shuffle_list(ids),
-                                                  metadata)))
+    relabled_data.SampleIds = shuffle_list(otus)
+    relabled_data.samp_md = shuffle_list(metadata)
     return mapping, relabled_data
 
 
