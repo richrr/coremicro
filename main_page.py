@@ -26,6 +26,7 @@ class MainPage(webapp2.RequestHandler):
 
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
+        min_abundance = self.request.get('min_abundance')
         random_opt = self.request.get('random_opt')
 
         to_email = self.request.get('email')
@@ -64,6 +65,7 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': group,
                 'out_group': out_group,
+                'min_abundance': min_abundance,
                 'name': 'interest'
             }
         ]
@@ -73,6 +75,7 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': out_group,
                 'out_group': group,
+                'min_abundance': min_abundance,
                 'name': 'out'
                 }
             )

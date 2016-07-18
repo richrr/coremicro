@@ -57,6 +57,17 @@
         </div>
 
         <div class="form-group">
+          <label for="min_abundance">Minimum Abundance</label><br>
+          <input type="number" id="min_abundance" name="min_abundance"
+                 value="0" min="0" required>
+          <p class="help-block">
+            The minimum abundance a measurement must have to be considered
+            present. This can be a relative or absolute abundance depending on
+            which the datafile uses.
+          </p>
+        </div>
+
+        <div class="form-group">
           <label for="random">Number of randomizations</label><br>
 	  <input type="number" name="random" value="1000" size="30" max="1500" required>
           <p class="help-block">

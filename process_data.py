@@ -118,16 +118,17 @@ def collate_result(compiled, result):
 def run_data(mapping, data, run_cfgs):
     res = dict()
     for cfg in run_cfgs:
-        res[cfg['name']] = get_core(mapping, data, cfg['group'])
+        res[cfg['name']] = get_core(mapping, data, cfg['group'],
+                                    min_abundance=cfg['min_abundance'])
     return res
 
 
-def get_core(mapping, data, group):
+def get_core(mapping, data, group, min_abundance=0):
     # a table of presence/absence data for just the interest group samples
     interest = data.filterSamples(lambda values, id, md: id in mapping[group])
     interest_samples = len(interest.SampleIds)
     presence_counts = interest.transformSamples(
-        lambda l, id, md: numpy.array([v > 0 for v in l])
+        lambda l, id, md: numpy.array([v > min_abundance for v in l])
     ).sum(axis='observation')
     presence_fracs = [float(count) / interest_samples
                       for count in presence_counts]

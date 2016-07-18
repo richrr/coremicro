@@ -41,7 +41,8 @@ def generate_graph(params, inputs, results):
             for vals, id, md in interest_core.iterObservations():
                 ordered_otus.append(id)
                 interest_averages.append(numpy.mean(vals))
-                interest_frequencies.append(numpy.count_nonzero(vals))
+                interest_frequencies.append(sum([v > cfg['min_abundance']
+                                                 for v in vals]))
                 interest_errors.append(standard_error(vals))
 
             out_averages = []
@@ -49,7 +50,8 @@ def generate_graph(params, inputs, results):
             out_errors = []
             for vals, id, md in out_core.iterObservations():
                 out_averages.append(numpy.mean(vals))
-                out_frequencies.append(numpy.count_nonzero(vals))
+                out_frequencies.append(sum([v > cfg['min_abundance']
+                                            for v in vals]))
                 out_errors.append(standard_error(vals))
 
             # Sort everything by decreasing frequency in interest group
