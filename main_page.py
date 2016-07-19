@@ -26,7 +26,7 @@ class MainPage(webapp2.RequestHandler):
 
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
-        min_abundance = self.request.get('min_abundance')
+        min_abundance = float(self.request.get('min_abundance'))
         random_opt = self.request.get('random_opt')
 
         to_email = self.request.get('email')
