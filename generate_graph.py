@@ -15,6 +15,8 @@ def generate_graph(params, inputs, results):
     data = read_table(inputs['data'])
     attachments = list()
     cfg_to_group = {cfg['name']: cfg['group'] for cfg in params['run_cfgs']}
+    cfg_to_min_abundance = {cfg['name']: cfg['min_abundance']
+                            for cfg in params['run_cfgs']}
     for cfg in results:
         for frac in results[cfg]:
             otus = [res['otu'] for res in results[cfg][frac]]
@@ -24,8 +26,6 @@ def generate_graph(params, inputs, results):
             # Filter down to core otus
             core = data.filterObservations(lambda values, id, md:
                                            id in otus)
-            for val, id, md in core.iterObservations():
-                print id
             interest_core = core.filterSamples(lambda values, id, md:
                                                id in mapping[group])
             out_core = core.filterSamples(lambda values, id, md:
@@ -41,7 +41,7 @@ def generate_graph(params, inputs, results):
             for vals, id, md in interest_core.iterObservations():
                 ordered_otus.append(id)
                 interest_averages.append(numpy.mean(vals))
-                interest_frequencies.append(sum([v > cfg['min_abundance']
+                interest_frequencies.append(sum([v > cfg_to_min_abundance[cfg]
                                                  for v in vals]))
                 interest_errors.append(standard_error(vals))
 
@@ -50,7 +50,7 @@ def generate_graph(params, inputs, results):
             out_errors = []
             for vals, id, md in out_core.iterObservations():
                 out_averages.append(numpy.mean(vals))
-                out_frequencies.append(sum([v > cfg['min_abundance']
+                out_frequencies.append(sum([v > cfg_to_min_abundance[cfg]
                                             for v in vals]))
                 out_errors.append(standard_error(vals))
 
