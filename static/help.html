@@ -40,7 +40,9 @@
 	details of the BIOM format, why it is useful, or how to convert from traditional 
 	tab delimited OTU table to BIOM format file.<br>
 	
-	<b>Please make sure the header "taxonomy" is present and each OTU taxonomy is unique.</b>
+	<b>Please make sure the header "taxonomy" is present.</b> If the OTUs specified
+        under the taxonomy header are not unique, rows with the same OTU label will be
+        combined, with their values summed.
 	Most often this file would be an output from the OTU picking step from QIIME or 
 	other tools. A QIIME 1.8 compatible sample 
 	<a href="http://biom-format.org/documentation/format_versions/biom-1.0.html">
@@ -111,18 +113,27 @@
           <dt>Name for output/label</dt>
           <dd>This helps you to keep track of what this run indicates. It will be included in 
             name of all attached result files and the subject of all emails about your run.</dd>
+
           <dt>Interest group</dt>
           <dd>Enter ":" delimited EXACT string of the interest group on which you want core 
             microbiome analysis to be performed. For example, to calculate core microbiome of
             "Good" under the "Person" group (column), enter "Person:Good".</dd>
+
           <dt>Include Out-Group Results</dt>
           <dd>Whether the results of running the processing on the out-group should be included
             in the email as well. This is equivalent to re-running the processing with the
             interest group not selected in the previous field. For example, Person:Bad, rather
             than Person:Good.</dd>
+
+          <dt>Minimum Abundance</dt>
+          <dd>The minimum abundance a measurement must have to be considered
+            present. This can be a relative or absolute abundance depending on
+            which the datafile uses.</dd>
+            
           <dt>Number of randomizations</dt>
           <dd>Used to estimate the significance of core OTUs. Please keep this number greater
             than 500 and less than a 1500. 1000 is a good default.</dd>
+
           <dt>Randomization Type</dt>
           <dd>
             How to randomize the data
@@ -132,8 +143,10 @@
               <li>Column Wise: For each column (sample), shuffles the numbers</li>
               <li>OTU Label: Keeps the data table and sample annotation the same, only shuffles the otu taxonomies</li>
             </ul>
-          <dt><i>p</i>-value adjustment method</dt>
+
+            <dt><i>p</i>-value adjustment method</dt>
           <dd>To correct for multiple testings of OTUs. Benjamini Hochberg is a good default.</dd>
+
           <dt>Email</dt>
           <dd>The email address where you want your results emailed. <b>Your results are NOT 
               stored;</b> you will only get these results via email. </dd>
@@ -150,6 +163,14 @@
           out-group was selected as well then a second .tsv file will be attached containing those
           results.
         </p>
+
+        <p>Additionally, for each significance threshold a graph is generated showing the OTUs found
+          to be significant in that threshold and their average abundance across the samples in the
+          interest group and the out group. Because OTU names are often too long to fit on the graph,
+          the bars are labeled with integers and a .tsv file is included for each graph  relating the
+          integer labels with the OTU names. Additionally, the .tsv file includes the presence fraction
+          in the in and out groups for each OTU. The graphs are provided as a .svg file to allow enlargement
+          and editing as necessary.</p>
         
         <h2 id="method">Method Details</h2>
         Currently, the tool uses presence absence data to identify core microbiome OTUs.
