@@ -44,16 +44,16 @@ def combine_results(results):
 def format_results(res, params):
     attachments = list()
     for cfg in res:
-        sign_results = (('Significant results:\nOTU\tFreq. in randomized ' +
+        sign_results = (('OTU\tFreq. in randomized ' +
                          'data\tpval=freq/times randomized\t%s ' +
-                         'corrected pval\n')
+                         'corrected pval\tthreshold\n')
                         % params['p_val_adj'])
-        for frac in sorted(map(int, res[cfg].keys())):
-            sign_results += '\n#Frac thresh %s\n' % str(frac)
+        for frac in reversed(sorted(map(int, res[cfg].keys()))):
             for otu in res[cfg][str(frac)]:
-                sign_results += '%s\t%s\t%s\t%s\n' % (otu['otu'], otu['freq'],
-                                                      otu['pval'],
-                                                      otu['corrected_pval'])
+                sign_results += '%s\t%s\t%s\t%s\t%s\n' % (
+                    otu['otu'], otu['freq'], otu['pval'],
+                    otu['corrected_pval'], frac)
+        print sign_results
         attachments.append(('%s_results_%s.tsv' % (cfg, params['name']),
                             sign_results))
     return attachments
