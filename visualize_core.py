@@ -170,7 +170,7 @@ def parse_output(filename):
     with open(filename) as tsv:
         reader = csv.reader(tsv, delimiter='\t')
         for row in reader:
-            if (row[0] == ''):
+            if row[0] == '' or row[0] == 'OTU':
                 continue
             core.append({
                 'otu': row[0],
@@ -183,13 +183,13 @@ def parse_output(filename):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2 and len(sys.argv) != 3:
+    if len(sys.argv) not in [3, 4]:
         print("""Usage
     visualize_core.py [src].py [out].png [threshold]
 """)
-    core = parse_output(sys.argv[0])
-    if len(sys.argv) == 3:
-        threshold = int(sys.argv[2])
+    core = parse_output(sys.argv[1])
+    if len(sys.argv) == 4:
+        threshold = int(sys.argv[3])
     else:
         threshold = 0
 
@@ -206,4 +206,4 @@ if __name__ == '__main__':
     # tree = Tree('pruned.nh')
     c_signif = '#00441b'
     c_insignif = '#f7fcfd'
-    export_tree(tree, 'tree.png', c_signif, c_insignif)
+    export_tree(tree, sys.argv[2], c_signif, c_insignif)
