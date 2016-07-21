@@ -1,24 +1,6 @@
 import collections
 import logging
 
-import pipeline
-
-from storage import Results
-from generate_graph import generate_graph
-
-
-class ProcessResultsPipeline(pipeline.Pipeline):
-    def run(self, params, inputs, true_res):
-        logging.info('Processing results')
-        rand = combine_results(
-            Results.get_entries(self.root_pipeline_id))
-        res = {k: perform_sign_calc(v, rand[k], params)
-               for k, v in true_res.iteritems()}
-        attachments = list()
-        attachments += format_results(res, params)
-        attachments += generate_graph(params, inputs, res)
-        return attachments
-
 
 def get_attachments(res, graphs, params):
     attachments = [('%s_results_%s.tsv' % (k, params['name']),
@@ -44,82 +26,59 @@ def combine_results(results):
 def format_results(res, params):
     attachments = list()
     for cfg in res:
-        sign_results = (('OTU\tFreq. in randomized ' +
-                         'data\tpval=freq/times randomized\t%s ' +
+        sign_results = (('OTU\tpval\t%s ' +
                          'corrected pval\tthreshold\n')
                         % params['p_val_adj'])
         for frac in reversed(sorted(map(int, res[cfg].keys()))):
-            for otu in res[cfg][str(frac)]:
-                sign_results += '%s\t%s\t%s\t%s\t%s\n' % (
-                    otu['otu'], otu['freq'], otu['pval'],
+            for otu in res[cfg][frac]:
+                sign_results += '%s\t%s\t%s\t%s\n' % (
+                    otu['otu'], otu['pval'],
                     otu['corrected_pval'], frac)
-        print sign_results
         attachments.append(('%s_results_%s.tsv' % (cfg, params['name']),
                             sign_results))
     return attachments
 
 
-def perform_sign_calc(true_result_frac_thresh_otus_dict,
-                      glob_qry_entries_in_result_rand_dict,
-                      params):
-    p_val = 0.05
-    results = {}
-    logging.info('Performing significance calculations')
-    logging.info('%d thresholds present in randomized data',
-                 len(glob_qry_entries_in_result_rand_dict))
-    for frac_s in glob_qry_entries_in_result_rand_dict.keys():
-        results[frac_s] = []
-        randomized_otus = glob_qry_entries_in_result_rand_dict[frac_s]
-        logging.info('Number of OTUs from randomized dict for %s%% ' +
-                     'threshold = %d',
-                     frac_s, len(randomized_otus))
+def get_final_results(true_res, pval_res, params):
+    MAX_PVAL = 0.05
+    results = dict()
+    for cfg in params['run_cfgs']:
+        results[cfg['name']] = dict()
+        true = true_res[cfg['name']]
+        pvals = pval_res[cfg['name']]
 
-        # check significance
-        signif_core_microb_otu_dict = collections.OrderedDict()
-        for o in true_result_frac_thresh_otus_dict[str(frac_s)]:
-            freq = 0.1
-            # the else for this means it was not observed even once in the
-            # randomized data!
-            if o in randomized_otus:
-                freq = int(randomized_otus[o])
-            otus_pval = freq/float(params['ntimes'])
-            if otus_pval < p_val:
-                signif_core_microb_otu_dict[o] = otus_pval
+        for frac in true:
+            results[cfg['name']][frac] = list()
+            signif = []
+            signif_pvals = []
+            for otu in true[frac]:
+                if pvals[frac][otu] < MAX_PVAL:
+                    signif.append(otu)
+                    signif_pvals.append(pvals[frac][otu])
+            if len(signif) == 0:
+                logging.info('There are no signif core microb without ' +
+                             'corrections')
+                continue
+            else:
+                logging.info(('There are %s signif core microb without ' +
+                              'corrections') % str(len(signif)))
+            if params['p_val_adj'] == 'bf':
+                signif_pvals_corrected = correct_pvalues_for_multiple_testing(
+                    signif_pvals, 'Bonferroni')
+            elif params['p_val_adj'] == 'bh':
+                signif_pvals_corrected = correct_pvalues_for_multiple_testing(
+                    signif_pvals, 'Benjamini-Hochberg')
+            elif params['p_val_adj'] == 'none':
+                signif_pvals_corrected = signif_pvals
 
-        # check if there is at least one significant entry so far:
-        if len(signif_core_microb_otu_dict) == 0:
-            logging.info('There are no signif core microb without corrections')
-            continue            # go to next iteration
-        else:
-            logging.info('There are %s signif core microb without corrections'
-                         % str(len(signif_core_microb_otu_dict)))
-
-        # adjust the pvalues of significant otus for multiple testing
-        new_p_vals = list()
-        if params['p_val_adj'] == 'bf':
-            new_p_vals = correct_pvalues_for_multiple_testing(
-                signif_core_microb_otu_dict.values(), "Bonferroni")
-        elif params['p_val_adj'] == 'bh':
-            new_p_vals = correct_pvalues_for_multiple_testing(
-                signif_core_microb_otu_dict.values(), "Benjamini-Hochberg")
-        elif params['p_val_adj'] == 'none':
-            new_p_vals = signif_core_microb_otu_dict.values()
-
-        counter = 0
-        for o in signif_core_microb_otu_dict.keys():
-            freq = int(randomized_otus[o])
-            # p value before correction (from randomized runs)
-            otus_pval = freq/float(params['ntimes'])
-            new_p_v = new_p_vals[counter]  # p value after correction
-            if new_p_v < p_val:
-                results[frac_s].append({
-                    'otu': o,
-                    'freq': freq,
-                    'pval': otus_pval,
-                    'corrected_pval': new_p_v,
-                    'threshold': frac_s,
-                })
-            counter += 1
+            for i in xrange(len(signif)):
+                if signif_pvals_corrected[i] < MAX_PVAL:
+                    results[cfg['name']][frac].append({
+                        'otu': signif[i],
+                        'pval': signif_pvals[i],
+                        'corrected_pval': signif_pvals_corrected[i],
+                        'threshold': frac,
+                    })
     return results
 
 

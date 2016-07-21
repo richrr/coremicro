@@ -1,19 +1,16 @@
-from google.appengine.runtime import DeadlineExceededError
-
 from itertools import compress
 
-from process_results import ProcessResultsPipeline
+from process_results import get_final_results, format_results
 
-import datetime
-import collections
 import logging
 import numpy
 
-from storage import Results
 from email_results import send_error_as_email, send_results_as_email
-from randomize_data import randomize
 from read_table import read_table
 import run_config
+from probability import row_randomize_probability
+from generate_graph import generate_graph
+
 
 import pipeline
 import pipeline.common
@@ -22,30 +19,16 @@ import pipeline.common
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
-        ntimes = int(params['ntimes'])
 
         true_res = run_data(inputs['mapping_dict'],
                             read_table(inputs['data']),
                             params['run_cfgs'])
-        processing = []
-        if ntimes <= run_config.MAX_NUM_PARALLEL:
-            pipes = [1 for i in range(ntimes)]
-        else:
-            # list of number of times to run in each pipe
-            pipes = [ntimes/run_config.MAX_NUM_PARALLEL
-                     for i in range(run_config.MAX_NUM_PARALLEL)]
-            left_over = ntimes % run_config.MAX_NUM_PARALLEL
-            for i in range(left_over):
-                pipes[i] += 1
-        logging.info('Starting %d parallel tasks for randomized data',
-                     len(pipes))
-        for i in range(len(pipes)):
-            res = yield RunRandomDataPipeline(inputs, params, pipes[i], i + 1,
-                                              len(pipes))
-            processing.append(res)
-        with pipeline.InOrder():
-            yield pipeline.common.Ignore(*processing)
-            yield ProcessResultsPipeline(params, inputs, true_res)
+        pval_res = get_random_results(params, inputs)
+        results = get_final_results(true_res, pval_res, params)
+        attachments = list()
+        attachments += format_results(results, params)
+        attachments += generate_graph(params, inputs, results)
+        send_results_as_email(params, attachments)
 
     def finalized(self):
         logging.info('Finalizing task')
@@ -55,64 +38,23 @@ class RunPipeline(pipeline.Pipeline):
             error = 'An unknown error has occured. Please try again. ' +\
                     'If this occurs again please contact the developers'
             send_error_as_email(params, error)
-        else:
-            attachments = self.outputs.default.value
-            send_results_as_email(params, attachments)
-            Results.delete_entries(self.root_pipeline_id)
         self.cleanup()
 
 
-class RunRandomDataPipeline(pipeline.Pipeline):
-    def run(self, inputs, params, num, process_id, num_processes):
-        logging.info('Pipeline %d of %d starting run of %d randomizations',
-                     process_id, num_processes, num)
-        start = datetime.datetime.now()
-        res = {cfg['name']: dict() for cfg in params['run_cfgs']}
-        parsed_data = read_table(inputs['data'])
-
-        for i in range(num):
-            try:
-                logging.info('Pipeline %d of %d running run %d of %d',
-                             process_id, num_processes, i + 1, num)
-                random_mapping, random_data = randomize(inputs['mapping_dict'],
-                                                        parsed_data,
-                                                        params['random_opt'])
-                collate_result(res, run_data(random_mapping, random_data,
-                                             params['run_cfgs']))
-                now = datetime.datetime.now()
-                # assume the next run will take the average of completed runs
-                if ((now - start) * (i + 2)) // (i + 1) > \
-                   run_config.MAX_RUNNING_TIME:
-                    logging.info('Pipeline %d of %d starting child process ' +
-                                 'to avoid deadline',
-                                 process_id, num_processes)
-                    Results.add_entry(self.root_pipeline_id,
-                                      self.pipeline_id, res)
-                    yield RunRandomDataPipeline(inputs, params, num - i - 1,
-                                                process_id, num_processes)
-                    break
-            except DeadlineExceededError:
-                logging.info('Pipeline %d of %d ran out of time; ' +
-                             'starting child process',
-                             process_id, num_processes)
-                Results.add_entry(self.root_pipeline_id, self.pipeline_id, res)
-                yield RunRandomDataPipeline(inputs, params, num - i - 1,
-                                            process_id, num_processes)
-                break
-            if i == num - 1:
-                logging.info('Pipeline %s processed all runs',
-                             self.pipeline_id)
-                Results.add_entry(self.root_pipeline_id, self.pipeline_id, res)
-                return
-
-
-def collate_result(compiled, result):
-    for cfg in result:
-        for threshold, otus in result[cfg].items():
-            if threshold in compiled[cfg]:
-                compiled[cfg][threshold].update(otus)
-            else:
-                compiled[cfg][threshold] = collections.Counter(otus)
+def get_random_results(params, inputs):
+    data = read_table(inputs['data'])
+    results = dict()
+    for cfg in params['run_cfgs']:
+        n_interest = len(inputs['mapping_dict'][cfg['group']])
+        results[cfg['name']] = {int(100 * frac): dict()
+                                for frac in run_config.FRACS}
+        for vals, otu, md in data.iterObservations():
+            for frac, pval in zip(run_config.FRACS,
+                                  row_randomize_probability(
+                                      vals, n_interest,
+                                      cfg['min_abundance'])):
+                results[cfg['name']][int(frac * 100)][otu] = pval
+    return results
 
 
 def run_data(mapping, data, run_cfgs):
