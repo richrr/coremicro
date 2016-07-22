@@ -9,7 +9,6 @@ IN_CORE_FEATURE = 'in_core'
 IN_OUT_FEATURE = 'in_out'
 TAXA_FEATURE = 'taxa'
 OTU_FEATURE = 'otu'
-FREQ_FEATURE = 'freq'
 P_VAL_FEATURE = 'p_val'
 CORRECTED_P_VAL_FEATURE = 'corrected_p_val'
 THRESHOLD_FEATURE = 'threshold'
@@ -106,7 +105,6 @@ def annotate_otu(otu, tree, taxa_code_mapping, group_feature):
         group_feature: True,
         TAXA_FEATURE: otu_taxa,
         OTU_FEATURE: otu['otu'],
-        FREQ_FEATURE: otu['freq'],
         P_VAL_FEATURE: otu['pval'],
         CORRECTED_P_VAL_FEATURE: otu['corrected_pval'],
         THRESHOLD_FEATURE: otu['threshold'],
@@ -174,22 +172,22 @@ def parse_output(filename):
                 continue
             core.append({
                 'otu': row[0],
-                'freq': int(row[1]),
-                'pval': float(row[2]),
-                'corrected_pval': float(row[3]),
-                'threshold': int(row[4]),
+                'pval': float(row[1]),
+                'corrected_pval': float(row[2]),
+                'threshold': int(row[3]),
             })
     return core
 
 
 if __name__ == '__main__':
-    if len(sys.argv) not in [3, 4]:
+    if len(sys.argv) not in [4, 5]:
         print("""Usage
-    visualize_core.py [src].py [out].png [threshold]
+        visualize_core.py <core.tsv> <out.tsv> <out.png> [threshold]
 """)
     core = parse_output(sys.argv[1])
-    if len(sys.argv) == 4:
-        threshold = int(sys.argv[3])
+    out = parse_output(sys.argv[2])
+    if len(sys.argv) == 5:
+        threshold = int(sys.argv[4])
     else:
         threshold = 0
 
@@ -200,10 +198,13 @@ if __name__ == '__main__':
     print 'finding and marking core and out groups'
     core_nodes = annotate_group(core, tree, mapping, IN_CORE_FEATURE,
                                 threshold)
+    out_nodes = annotate_group(out, tree, mapping, IN_OUT_FEATURE,
+                               threshold)
+
     print 'pruning...'
-    tree.prune(core_nodes)
+    tree.prune(core_nodes + out_nodes)
 
     # tree = Tree('pruned.nh')
     c_signif = '#00441b'
     c_insignif = '#f7fcfd'
-    export_tree(tree, sys.argv[2], c_signif, c_insignif)
+    export_tree(tree, sys.argv[3], c_signif, c_insignif)
