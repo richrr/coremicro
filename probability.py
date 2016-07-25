@@ -14,10 +14,6 @@ def row_randomize_probability(vals, n_interest, min_abundance=0):
         if present < needed:
             results.append(0)
         else:
-            [nCr(present, need) *
-             nCr(total - present, n_interest - need)
-             for need in xrange(needed, min(present, n_interest) + 1)
-             if total - present >= n_interest - need]
             results.append(sum([nCr(present, need) *
                                 nCr(total - present, n_interest - need)
                                 for need in xrange(needed,
