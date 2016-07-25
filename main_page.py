@@ -84,7 +84,7 @@ class MainPage(webapp2.RequestHandler):
             send_error_as_email(timestamp, user_args, '\n'.join(errors_list),
                                 to_email)
             # TODO: Return form with error marked
-            sys.exit(0)
+            self.redirect('/')
 
         pipeline = RunPipeline(params, inputs)
         pipeline.start()
