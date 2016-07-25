@@ -81,8 +81,7 @@ class MainPage(webapp2.RequestHandler):
             )
 
         if len(errors_list) > 0:
-            send_error_as_email(timestamp, user_args, '\n'.join(errors_list),
-                                to_email)
+            send_error_as_email(params, '\n'.join(errors_list))
             # TODO: Return form with error marked
             self.redirect('/')
 
