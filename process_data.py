@@ -1,6 +1,6 @@
 from itertools import compress
 
-from process_results import (get_final_results, format_results,
+from process_results import (format_results,
                              correct_pvalues_for_multiple_testing)
 
 import logging
@@ -24,8 +24,6 @@ class RunPipeline(pipeline.Pipeline):
 
         true_res = run_data(inputs['mapping_dict'], data, params['run_cfgs'])
         results = get_results(true_res, data, inputs, params)
-        # pval_res = get_random_results(params, inputs)
-        # results = get_final_results(true_res, pval_res, params)
         attachments = list()
         attachments += format_results(results, params)
         attachments += generate_graph(params, inputs, results)

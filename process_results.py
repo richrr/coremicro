@@ -1,5 +1,4 @@
 import collections
-import logging
 
 
 def get_attachments(res, graphs, params):
@@ -38,42 +37,6 @@ def format_results(res, params):
                             sign_results))
         print sign_results
     return attachments
-
-
-def get_final_results(true_res, pval_res, params):
-    MAX_PVAL = 0.05
-    results = dict()
-    for cfg in params['run_cfgs']:
-        results[cfg['name']] = dict()
-        true = true_res[cfg['name']]
-        pvals = pval_res[cfg['name']]
-
-        for frac in true:
-            results[cfg['name']][frac] = list()
-            signif = []
-            signif_pvals = []
-            for otu in true[frac]:
-                if pvals[frac][otu] < MAX_PVAL:
-                    signif.append(otu)
-                    signif_pvals.append(pvals[frac][otu])
-            if len(signif) == 0:
-                logging.info('There are no signif core microb without ' +
-                             'corrections')
-                continue
-            else:
-                logging.info(('There are %s signif core microb without ' +
-                              'corrections') % str(len(signif)))
-            signif_pvals_corrected = correct_pvalues_for_multiple_testing(
-                signif_pvals, params['p_val_adj'])
-            for i in xrange(len(signif)):
-                if signif_pvals_corrected[i] < MAX_PVAL:
-                    results[cfg['name']][frac].append({
-                        'otu': signif[i],
-                        'pval': signif_pvals[i],
-                        'corrected_pval': signif_pvals_corrected[i],
-                        'threshold': int(frac * 100),
-                    })
-    return results
 
 
 # http://stackoverflow.com/questions/7450957/how-to-implement-rs-p-adjust-in-python
