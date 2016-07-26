@@ -63,15 +63,8 @@ def get_final_results(true_res, pval_res, params):
             else:
                 logging.info(('There are %s signif core microb without ' +
                               'corrections') % str(len(signif)))
-            if params['p_val_adj'] == 'bf':
-                signif_pvals_corrected = correct_pvalues_for_multiple_testing(
-                    signif_pvals, 'Bonferroni')
-            elif params['p_val_adj'] == 'bh':
-                signif_pvals_corrected = correct_pvalues_for_multiple_testing(
-                    signif_pvals, 'Benjamini-Hochberg')
-            elif params['p_val_adj'] == 'none':
-                signif_pvals_corrected = signif_pvals
-
+            signif_pvals_corrected = correct_pvalues_for_multiple_testing(
+                signif_pvals, params['p_val_adj'])
             for i in xrange(len(signif)):
                 if signif_pvals_corrected[i] < MAX_PVAL:
                     results[cfg['name']][frac].append({
@@ -97,7 +90,7 @@ def correct_pvalues_for_multiple_testing(pvalues,
     pvalues = array(pvalues)
     n = float(pvalues.shape[0])
     new_pvalues = empty(n)
-    if correction_type == "Bonferroni":
+    if correction_type == "bf":  # Bonferroni
         new_pvalues = n * pvalues
     elif correction_type == "Bonferroni-Holm":
         values = [(pvalue, i) for i, pvalue in enumerate(pvalues)]
@@ -105,7 +98,7 @@ def correct_pvalues_for_multiple_testing(pvalues,
         for rank, vals in enumerate(values):
             pvalue, i = vals
             new_pvalues[i] = (n-rank) * pvalue
-    elif correction_type == "Benjamini-Hochberg":
+    elif correction_type == "bh":  # Benjamini-Hochberg
         values = [(pvalue, i) for i, pvalue in enumerate(pvalues)]
         values.sort()
         values.reverse()
@@ -120,6 +113,6 @@ def correct_pvalues_for_multiple_testing(pvalues,
         for i, vals in enumerate(values):
             pvalue, index = vals
             new_pvalues[index] = new_values[i]
-    elif correction_type == "None":
+    elif correction_type == "none":
         new_pvalues = 1 * pvalues
     return new_pvalues

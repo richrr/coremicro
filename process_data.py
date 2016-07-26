@@ -56,14 +56,8 @@ def get_results(true_res, data, inputs, params):
                                                n_interest, frac,
                                                cfg['min_abundance'])
                      for otu in true[frac]]
-            if params['p_val_adj'] == 'bf':
-                pvals_corrected = correct_pvalues_for_multiple_testing(
-                    pvals, 'Bonferroni')
-            elif params['p_val_adj'] == 'bh':
-                pvals_corrected = correct_pvalues_for_multiple_testing(
-                    pvals, 'Benjamini-Hochberg')
-            elif params['p_val_adj'] == 'none':
-                pvals_corrected = pvals
+            pvals_corrected = correct_pvalues_for_multiple_testing(
+                pvals, params['p_val_adj'])
             for i, otu in enumerate(true[frac]):
                 if pvals_corrected[i] < MAX_PVAL:
                     results[cfg['name']][frac].append({
