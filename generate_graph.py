@@ -77,11 +77,12 @@ def generate_graph(params, inputs, results):
                 plt.legend((interest[0], out[0]), (config['group'],
                                                    config['out_group']))
                 plt.title('Abundance of Core Microbes at %s%% Threshold' %
-                          frac)
+                          int(frac * 100))
 
                 out = StringIO.StringIO()
                 plt.savefig(out, format='svg')
-                attachments.append(('%s_plot_%s_%s.svg' % (cfg, frac,
+                attachments.append(('%s_plot_%s_%s.svg' % (cfg,
+                                                           int(frac * 100),
                                                            params['name']),
                                     out.getvalue()))
                 plt.clf()
@@ -97,7 +98,7 @@ def generate_graph(params, inputs, results):
                     ordered_otus[i])
 
             attachments.append(('%s_plot_labels_%s_%s.tsv' %
-                                (cfg, frac, params['name']),
+                                (cfg, int(frac * 100), params['name']),
                                 ref_text))
     if not run_config.IS_PRODUCTION:
         logging.warn('Graphs not generated because in development mode')

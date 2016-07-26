@@ -29,13 +29,14 @@ def format_results(res, params):
         sign_results = (('OTU\tpval\t%s ' +
                          'corrected pval\tthreshold\n')
                         % params['p_val_adj'])
-        for frac in reversed(sorted(map(int, res[cfg].keys()))):
+        for frac in reversed(sorted(res[cfg].keys())):
             for otu in res[cfg][frac]:
                 sign_results += '%s\t%s\t%s\t%s\n' % (
                     otu['otu'], otu['pval'],
-                    otu['corrected_pval'], frac)
+                    otu['corrected_pval'], int(frac * 100))
         attachments.append(('%s_results_%s.tsv' % (cfg, params['name']),
                             sign_results))
+        print sign_results
     return attachments
 
 
@@ -77,7 +78,7 @@ def get_final_results(true_res, pval_res, params):
                         'otu': signif[i],
                         'pval': signif_pvals[i],
                         'corrected_pval': signif_pvals_corrected[i],
-                        'threshold': frac,
+                        'threshold': int(frac * 100),
                     })
     return results
 
