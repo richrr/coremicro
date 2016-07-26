@@ -21,14 +21,6 @@ The Core Microbiome Team
     message = make_base_email(subj, params['to_email'], msg_str)
     message.body = msg_str
     message.attachments = attachments
-    # [
-    #     ('results_%s.tsv' % params['name'], results.encode('utf-8')),
-    #     ('tree_%s.nh' % params['name'], tree.encode('utf-8'))
-    # ]
-    # if params['include_out']:
-    #     message.attachments.append(
-    #         ('out_results_%s.nsv' % params['name'], out.encode('utf-8')),
-    #     )
 
     message.send()
 
