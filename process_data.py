@@ -57,7 +57,7 @@ def get_results(true_res, data, inputs, params):
             pvals_corrected = correct_pvalues_for_multiple_testing(
                 pvals, params['p_val_adj'])
             for i, otu in enumerate(true[frac]):
-                if pvals_corrected[i] < MAX_PVAL:
+                if pvals_corrected[i] <= MAX_PVAL:
                     results[cfg['name']][frac].append({
                         'otu': otu,
                         'pval': pvals[i],
