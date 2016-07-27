@@ -20,10 +20,10 @@ import pipeline.common
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
-        data = read_table(inputs['data'])
+        inputs['filtered_data'] = read_table(inputs['data'])
 
-        true_res = run_data(inputs['mapping_dict'], data, params['run_cfgs'])
-        results = get_results(true_res, data, inputs, params)
+        results = map_to_configs(get_results, params, inputs,
+                                 map_to_configs(get_core, params, inputs))
         attachments = list()
         attachments += format_results(results, params)
         attachments += generate_graph(params, inputs, results)
@@ -40,63 +40,61 @@ class RunPipeline(pipeline.Pipeline):
         self.cleanup()
 
 
-def get_results(true_res, data, inputs, params):
-    otu_to_vals = {otu: vals for vals, otu, md in data.iterObservations()}
+def map_to_configs(f, params, inputs, *args):
+    return {cfg['name']: f(params, inputs, cfg, *args)
+            for cfg in params['run_cfgs']}
+
+
+def get_results(params, inputs, cfg, true_res):
+    otu_to_vals = {otu: vals for vals, otu, md
+                   in inputs['filtered_data'].iterObservations()}
     MAX_PVAL = 0.05
     results = dict()
-    for cfg in params['run_cfgs']:
-        n_interest = len(inputs['mapping_dict'][cfg['group']])
-        results[cfg['name']] = dict()
-        true = true_res[cfg['name']]
-        for frac in true:
-            results[cfg['name']][frac] = list()
-            pvals = [row_randomize_probability(otu_to_vals[otu],
-                                               n_interest, frac,
-                                               cfg['min_abundance'])
-                     for otu in true[frac]]
-            pvals_corrected = correct_pvalues_for_multiple_testing(
-                pvals, params['p_val_adj'])
-            for i, otu in enumerate(true[frac]):
-                if pvals_corrected[i] <= MAX_PVAL:
-                    results[cfg['name']][frac].append({
-                        'otu': otu,
-                        'pval': pvals[i],
-                        'corrected_pval': pvals_corrected[i],
-                        'threshold': frac,
-                    })
+
+    n_interest = len(inputs['mapping_dict'][cfg['group']])
+    results[cfg['name']] = dict()
+    true = true_res[cfg['name']]
+    for frac in true:
+        results[frac] = list()
+        pvals = [row_randomize_probability(otu_to_vals[otu],
+                                           n_interest, frac,
+                                           cfg['min_abundance'])
+                 for otu in true[frac]]
+        pvals_corrected = correct_pvalues_for_multiple_testing(
+            pvals, params['p_val_adj'])
+        for i, otu in enumerate(true[frac]):
+            if pvals_corrected[i] <= MAX_PVAL:
+                results[frac].append({
+                    'otu': otu,
+                    'pval': pvals[i],
+                    'corrected_pval': pvals_corrected[i],
+                    'threshold': frac,
+                })
     return results
 
 
-def get_random_results(params, inputs):
-    data = read_table(inputs['data'])
+def get_random_results(params, inputs, cfg):
     results = dict()
-    for cfg in params['run_cfgs']:
-        n_interest = len(inputs['mapping_dict'][cfg['group']])
-        results[cfg['name']] = {frac: dict()
-                                for frac in run_config.FRACS}
-        for vals, otu, md in data.iterObservations():
-            for frac, pval in zip(run_config.FRACS,
-                                  row_randomize_probability(
-                                      vals, n_interest,
-                                      cfg['min_abundance'])):
-                results[cfg['name']][frac][otu] = pval
+    n_interest = len(inputs['mapping_dict'][cfg['group']])
+    results = {frac: dict()
+               for frac in run_config.FRACS}
+    for vals, otu, md in inputs['filtered_data'].iterObservations():
+        for frac, pval in zip(run_config.FRACS,
+                              row_randomize_probability(
+                                  vals, n_interest,
+                                  cfg['min_abundance'])):
+            results[frac][otu] = pval
     return results
 
 
-def run_data(mapping, data, run_cfgs):
-    res = dict()
-    for cfg in run_cfgs:
-        res[cfg['name']] = get_core(mapping, data, cfg['group'],
-                                    min_abundance=cfg['min_abundance'])
-    return res
-
-
-def get_core(mapping, data, group, min_abundance=0):
+def get_core(params, inputs, cfg):
+    mapping = inputs['mapping_dict']
     # a table of presence/absence data for just the interest group samples
-    interest = data.filterSamples(lambda values, id, md: id in mapping[group])
+    interest = inputs['filtered_data'].filterSamples(
+        lambda values, id, md: id in mapping[cfg['group']])
     interest_samples = len(interest.SampleIds)
     presence_counts = interest.transformSamples(
-        lambda l, id, md: numpy.array([v > min_abundance for v in l])
+        lambda l, id, md: numpy.array([v > cfg['min_abundance'] for v in l])
     ).sum(axis='observation')
     presence_fracs = [float(count) / interest_samples
                       for count in presence_counts]
