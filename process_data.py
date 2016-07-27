@@ -22,8 +22,10 @@ class RunPipeline(pipeline.Pipeline):
         logging.info('Starting run')
         inputs['filtered_data'] = read_table(inputs['data'])
 
-        results = map_to_configs(get_results, params, inputs,
-                                 map_to_configs(get_core, params, inputs))
+        results = for_each_config(get_signif_otus,
+                                  params, inputs,
+                                  for_each_config(get_core_otus,
+                                                  params, inputs))
         attachments = list()
         attachments += format_results(results, params)
         attachments += generate_graph(params, inputs, results)
@@ -40,12 +42,12 @@ class RunPipeline(pipeline.Pipeline):
         self.cleanup()
 
 
-def map_to_configs(f, params, inputs, *args):
+def for_each_config(f, params, inputs, *args):
     return {cfg['name']: f(params, inputs, cfg, *args)
             for cfg in params['run_cfgs']}
 
 
-def get_results(params, inputs, cfg, true_res):
+def get_signif_otus(params, inputs, cfg, true_res):
     otu_to_vals = {otu: vals for vals, otu, md
                    in inputs['filtered_data'].iterObservations()}
     MAX_PVAL = 0.05
@@ -87,7 +89,7 @@ def get_random_results(params, inputs, cfg):
     return results
 
 
-def get_core(params, inputs, cfg):
+def get_core_otus(params, inputs, cfg):
     mapping = inputs['mapping_dict']
     # a table of presence/absence data for just the interest group samples
     interest = inputs['filtered_data'].filterSamples(

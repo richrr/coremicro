@@ -1,6 +1,3 @@
-import collections
-
-
 def get_attachments(res, graphs, params):
     attachments = [('%s_results_%s.tsv' % (k, params['name']),
                     format_results(v, params['p_val_adj']))
@@ -8,18 +5,6 @@ def get_attachments(res, graphs, params):
     attachments += [('%s_plot_%s.svg' % (k, params['name']), v)
                     for k, v in graphs.iteritems()]
     return attachments
-
-
-def combine_results(results):
-    combined = {k: dict() for k, v in results.get().res.iteritems()}
-    for result in results:
-        for cfg in result.res:
-            for threshold, otus in result.res[cfg].items():
-                if threshold in combined[cfg]:
-                    combined[cfg][threshold].update(otus)
-                else:
-                    combined[cfg][threshold] = collections.Counter(otus)
-    return combined
 
 
 def format_results(res, params):
