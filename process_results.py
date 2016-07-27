@@ -53,15 +53,15 @@ def correct_pvalues_for_multiple_testing(pvalues,
     pvalues = array(pvalues)
     n = float(pvalues.shape[0])
     new_pvalues = empty(n)
-    if correction_type == "bf":  # Bonferroni
+    if correction_type == 'bf':  # Bonferroni
         new_pvalues = n * pvalues
-    elif correction_type == "Bonferroni-Holm":
+    elif correction_type == 'bf-h':  # Bonferroni-Holm
         values = [(pvalue, i) for i, pvalue in enumerate(pvalues)]
         values.sort()
         for rank, vals in enumerate(values):
             pvalue, i = vals
             new_pvalues[i] = (n-rank) * pvalue
-    elif correction_type == "bh":  # Benjamini-Hochberg
+    elif correction_type == 'b-h':  # Benjamini-Hochberg
         values = [(pvalue, i) for i, pvalue in enumerate(pvalues)]
         values.sort()
         values.reverse()
