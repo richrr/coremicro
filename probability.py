@@ -7,16 +7,19 @@ def row_randomize_probability(vals, n_interest, frac, min_abundance=0):
     """
     present = sum([v > min_abundance for v in vals])
     total = len(vals)
-    needed = int(math.ceil(frac * n_interest))
-    if present < needed:
+    min_needed = max(
+        int(math.ceil(frac * n_interest)),
+        int(math.floor(present - frac * (total - n_interest))) + 1
+    )
+    if present < min_needed:
         return 0
     else:
         return (sum([nCr(present, need) *
                     nCr(total - present, n_interest - need)
-                    for need in xrange(needed,
+                    for need in xrange(min_needed,
                                        min(present,
                                            n_interest) + 1)
-                    if total - present >= n_interest - need]) /
+                     if total - present >= n_interest - need]) /
                 nCr(total, n_interest))
 
 

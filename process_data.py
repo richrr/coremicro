@@ -90,18 +90,21 @@ def get_random_results(params, inputs, cfg):
 
 
 def get_core_otus(params, inputs, cfg):
-    mapping = inputs['mapping_dict']
-    # a table of presence/absence data for just the interest group samples
-    interest = inputs['filtered_data'].filterSamples(
-        lambda values, id, md: id in mapping[cfg['group']])
-    interest_samples = len(interest.SampleIds)
-    presence_counts = interest.transformSamples(
-        lambda l, id, md: numpy.array([v > cfg['min_abundance'] for v in l])
-    ).sum(axis='observation')
-    presence_fracs = [float(count) / interest_samples
-                      for count in presence_counts]
-    otus = [observation[1] for observation in interest.iterObservations()]
-    return {frac:
-            list(compress(otus, [presence >= frac
-                                 for presence in presence_fracs]))
+    interest_presence_fracs = {
+        otu: float(sum([v > cfg['min_abundance'] for v in vals])) / len(vals)
+        for vals, otu, md in inputs['filtered_data'].filterSamples(
+                lambda values, id, md:
+                id in inputs['mapping_dict'][cfg['group']]
+        ).iterObservations()
+    }
+    out_presence_fracs = {
+        otu: float(sum([v > cfg['min_abundance'] for v in vals])) / len(vals)
+        for vals, otu, md in inputs['filtered_data'].filterSamples(
+                lambda values, id, md:
+                id in inputs['mapping_dict'][cfg['out_group']]
+        ).iterObservations()
+    }
+    return {frac: [otu for otu in interest_presence_fracs.keys()
+                   if (interest_presence_fracs[otu] >= frac and
+                       out_presence_fracs[otu] < frac)]
             for frac in run_config.FRACS}
