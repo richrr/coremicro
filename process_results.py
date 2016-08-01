@@ -1,26 +1,16 @@
-def get_attachments(res, graphs, params):
-    attachments = [('%s_results_%s.tsv' % (k, params['name']),
-                    format_results(v, params['p_val_adj']))
-                   for k, v in res.iteritems()]
-    attachments += [('%s_plot_%s.svg' % (k, params['name']), v)
-                    for k, v in graphs.iteritems()]
-    return attachments
-
-
-def format_results(res, params):
+def format_results(res, params, cfg):
     attachments = list()
-    for cfg in res:
-        sign_results = (('OTU\tpval\t%s ' +
-                         'corrected pval\tthreshold\n')
-                        % params['p_val_adj'])
-        for frac in reversed(sorted(res[cfg].keys())):
-            for otu in res[cfg][frac]:
-                sign_results += '%s\t%s\t%s\t%s\n' % (
-                    otu['otu'], otu['pval'],
-                    otu['corrected_pval'], int(frac * 100))
-        attachments.append(('%s_results_%s.tsv' % (cfg, params['name']),
-                            sign_results))
-        print sign_results
+    sign_results = (('OTU\tpval\t%s ' +
+                     'corrected pval\tthreshold\n')
+                    % params['p_val_adj'])
+    for frac in reversed(sorted(res.keys())):
+        for otu in res[frac]:
+            sign_results += '%s\t%s\t%s\t%s\n' % (
+                otu['otu'], otu['pval'],
+                otu['corrected_pval'], int(frac * 100))
+    attachments.append(('%s_results_%s.tsv' % (cfg['name'], params['name']),
+                        sign_results))
+    print sign_results
     return attachments
 
 
