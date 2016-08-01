@@ -1,3 +1,6 @@
+import logging
+
+
 def format_results(res, params, cfg):
     attachments = list()
     sign_results = (('OTU\tpval\t%s ' +
@@ -14,43 +17,30 @@ def format_results(res, params, cfg):
     return attachments
 
 
-# http://stackoverflow.com/questions/7450957/how-to-implement-rs-p-adjust-in-python
-# the pvalues do not have to be sorted, their order is maintained in the
-# results
-def correct_pvalues_for_multiple_testing(pvalues,
-                                         correction_type='Benjamini-Hochberg'):
-    """
-    consistent with R - print correct_pvalues_for_multiple_
-    testing([0.0, 0.01, 0.029, 0.03, 0.031, 0.05, 0.069, 0.07, 0.071,
-             0.09, 0.1])
-    """
-    from numpy import array, empty
-    pvalues = array(pvalues)
-    n = float(pvalues.shape[0])
-    new_pvalues = empty(n)
+def correct_pvalues_for_multiple_testing(pvalues, correction_type):
+    n = len(pvalues)
     if correction_type == 'bf':  # Bonferroni
-        new_pvalues = n * pvalues
+        new_pvalues = [n * p for p in pvalues]
     elif correction_type == 'bf-h':  # Bonferroni-Holm
-        values = [(pvalue, i) for i, pvalue in enumerate(pvalues)]
-        values.sort()
-        for rank, vals in enumerate(values):
-            pvalue, i = vals
-            new_pvalues[i] = (n-rank) * pvalue
+        values = sorted([(p, i) for i, p in enumerate(pvalues)])
+        new_pvalues = [None] * n
+        for rank, (p, i) in enumerate(values):
+            new_pvalues[i] = (n - rank) * p
     elif correction_type == 'b-h':  # Benjamini-Hochberg
-        values = [(pvalue, i) for i, pvalue in enumerate(pvalues)]
-        values.sort()
-        values.reverse()
-        new_values = []
-        for i, vals in enumerate(values):
-            rank = n - i
-            pvalue, index = vals
-            new_values.append((n/rank) * pvalue)
-        for i in xrange(0, int(n)-1):
-            if new_values[i] < new_values[i+1]:
-                new_values[i+1] = new_values[i]
-        for i, vals in enumerate(values):
-            pvalue, index = vals
-            new_pvalues[index] = new_values[i]
-    elif correction_type == "none":
-        new_pvalues = 1 * pvalues
+        values = list(reversed(sorted(
+            [(p, i) for i, p in enumerate(pvalues)]
+        )))
+        adjusted_vals = [float(n)/(n - i) * p
+                         for i, (p, index) in enumerate(values)]
+        for i in xrange(n - 1):
+            if adjusted_vals[i] < adjusted_vals[i + 1]:
+                adjusted_vals[i + 1] = adjusted_vals[i]
+        new_pvalues = [None] * n
+        for i, (p, index) in enumerate(values):
+            new_pvalues[index] = adjusted_vals[i]
+    elif correction_type == 'none':
+        new_pvalues = pvalues[:]
+    else:
+        logging.warn('Invalid correction type of "%s" given to correct_pvalues'
+                     % correction_type)
     return new_pvalues
