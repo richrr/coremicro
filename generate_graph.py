@@ -1,8 +1,8 @@
 import StringIO
 import numpy
 import logging
+from collections import namedtuple
 
-from read_table import read_table
 import run_config
 
 # matplotlib can't be run on the development server
@@ -17,54 +17,32 @@ def generate_graph(params, inputs, cfg, results):
         if len(otus) == 0:
             continue
 
-        ordered_otus, interest_averages, interest_frequencies,\
-            interest_errors, interest_core_samples = get_stats(
-                inputs, otus, cfg['group'], cfg['min_abundance'])
-        ordered_otus, out_averages, out_frequencies,\
-            out_errors, out_core_samples = get_stats(
-                inputs, otus, cfg['out_group'], cfg['min_abundance'])
+        stats, i_samples, o_samples = get_stats(inputs, otus,
+                                                cfg['group'],
+                                                cfg['out_group'],
+                                                cfg['min_abundance'])
 
-        # Sort everything by decreasing frequency in interest group
-        interest_averages, interest_frequencies, interest_errors, \
-            out_averages, out_frequencies, out_errors, \
-            ordered_otus \
-            = zip(*reversed(sorted(zip(
-                interest_averages, interest_frequencies, interest_errors,
-                out_averages, out_frequencies, out_errors,
-                ordered_otus))))
+        # Sort everything by decreasing average presence in interest group
+        stats = list(reversed(sorted(
+            stats, cmp=lambda a, b: cmp(a.i_average, b.i_average)
+        )))
 
-        width = 0.35
-        ind = [i + width/2 for i in range(len(otus))]
         if run_config.IS_PRODUCTION:
-            interest = plt.bar(ind, interest_averages, width, color='r',
-                               yerr=interest_errors)
-            out = plt.bar([i + width for i in ind], out_averages, width,
-                          color='y', yerr=out_errors)
-            plt.ylabel('Average Abundance')
-            plt.xlabel('Sample ID')
-            plt.xticks([i + width for i in ind], range(len(ordered_otus)))
-            plt.legend((interest[0], out[0]), (cfg['group'],
-                                               cfg['out_group']))
-            plt.title('Abundance of Core Microbes at %s%% Threshold' %
-                      int(frac * 100))
-
-            out = StringIO.StringIO()
-            plt.savefig(out, format='svg')
-            attachments.append(('%s_plot_%s_%s.svg' % (cfg['name'],
-                                                       int(frac * 100),
-                                                       params['name']),
-                                out.getvalue()))
-            plt.clf()
+            attachments.append((
+                '%s_plot_%s_%s.svg' % (cfg['name'], int(frac * 100),
+                                       params['name']),
+                make_graph(stats, cfg['group'], cfg['out_group'], frac)
+            ))
 
         ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
         for i in range(len(otus)):
             ref_text += '%s\t%d of %d\t%d of %d\t%s\n' % (
                 i,
-                interest_frequencies[i],
-                interest_core_samples,
-                out_frequencies[i],
-                out_core_samples,
-                ordered_otus[i])
+                stats[i].i_frequency,
+                i_samples,
+                stats[i].o_frequency,
+                o_samples,
+                stats[i].otu)
 
         attachments.append(('%s_plot_labels_%s_%s.tsv' %
                             (cfg['name'], int(frac * 100), params['name']),
@@ -74,29 +52,57 @@ def generate_graph(params, inputs, cfg, results):
     return attachments
 
 
-def get_stats(inputs, otus, group, min_abundance):
+def get_stats(inputs, otus, i_group, o_group, min_abundance):
+    Stats = namedtuple('Stats', ['otu', 'i_average', 'i_frequency', 'i_error',
+                                 'o_average', 'o_frequency', 'o_error'])
     core = inputs['filtered_data'].filterObservations(
         lambda values, id, md: id in otus
-    ).filterSamples(
-        lambda values, id, md: id in inputs['mapping_dict'][group]
+    )
+    interest = core.filterSamples(
+        lambda values, id, md: id in inputs['mapping_dict'][i_group]
+    )
+    out = core.filterSamples(
+        lambda values, id, md: id in inputs['mapping_dict'][o_group]
     )
 
-    core_samples = len(core.SampleIds)
+    res = list()
+    for ((i_vals, i_otu, i_md),
+         (o_vals, o_id, o_md)) in zip(interest.iterObservations(),
+                                      out.iterObservations()):
+        res.append(Stats(i_otu,
+                         numpy.mean(i_vals),
+                         sum([v > min_abundance for v in i_vals]),
+                         standard_error(i_vals),
+                         numpy.mean(o_vals),
+                         sum([v > min_abundance for v in o_vals]),
+                         standard_error(o_vals)))
 
-    ordered_otus = list()
-    averages = list()
-    frequencies = list()
-    errors = list()
-
-    for vals, id, md in core.iterObservations():
-            ordered_otus.append(id)
-            averages.append(numpy.mean(vals))
-            frequencies.append(sum([v > min_abundance
-                                    for v in vals]))
-            errors.append(standard_error(vals))
-
-    return ordered_otus, averages, frequencies, errors, core_samples
+    i_samples = len(interest.SampleIds)
+    o_samples = len(out.SampleIds)
+    return res, i_samples, o_samples
 
 
 def standard_error(a):
     return numpy.std(a, ddof=1)/numpy.sqrt(len(a))
+
+
+def make_graph(stats, i_group, o_group, frac):
+    width = 0.35
+    ind = [i + width/2 for i in range(len(stats))]
+    interest = plt.bar(ind, [s.i_average for s in stats],
+                       width, color='r',
+                       yerr=[s.i_error for s in stats])
+    out = plt.bar([i + width for i in ind],
+                  [s.o_average for o in stats], width,
+                  color='y', yerr=[s.o_error for s in stats])
+    plt.ylabel('Average Abundance')
+    plt.xlabel('Sample ID')
+    plt.xticks([i + width for i in ind], range(len(stats)))
+    plt.legend((interest[0], out[0]), (i_group, o_group))
+    plt.title('Abundance of Core Microbes at %s%% Threshold' %
+              int(frac * 100))
+
+    out = StringIO.StringIO()
+    plt.savefig(out, format='svg')
+    plt.clf()
+    return out.getvalue()

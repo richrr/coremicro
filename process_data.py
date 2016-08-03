@@ -44,21 +44,18 @@ def get_signif_otus(params, inputs, cfg, true_res):
     results[cfg['name']] = dict()
     true = true_res
     for frac in true:
-        results[frac] = list()
         pvals = [row_randomize_probability(otu_to_vals[otu],
                                            n_interest, frac,
                                            cfg['min_abundance'])
                  for otu in true[frac]]
         pvals_corrected = correct_pvalues_for_multiple_testing(
             pvals, params['p_val_adj'])
-        for i, otu in enumerate(true[frac]):
-            if pvals_corrected[i] <= MAX_PVAL:
-                results[frac].append({
-                    'otu': otu,
-                    'pval': pvals[i],
-                    'corrected_pval': pvals_corrected[i],
-                    'threshold': frac,
-                })
+        results[frac] = [{'otu': otu,
+                          'pval': pvals[i],
+                          'corrected_pval': pvals_corrected[i],
+                          'threshold': frac}
+                         for i, otu in enumerate(true[frac])
+                         if pvals_corrected[i] <= MAX_PVAL]
     return results
 
 
@@ -70,16 +67,13 @@ def core_otus(params, inputs, cfg):
                 id in inputs['mapping_dict'][cfg['group']]
         ).iterObservations()
     }
-    out_presence_fracs = {
+    total_presence_fracs = {
         otu: float(sum([v > cfg['min_abundance'] for v in vals])) / len(vals)
-        for vals, otu, md in inputs['filtered_data'].filterSamples(
-                lambda values, id, md:
-                id in inputs['mapping_dict'][cfg['out_group']]
-        ).iterObservations()
+        for vals, otu, md in inputs['filtered_data'].iterObservations()
     }
     return {frac: [otu for otu in interest_presence_fracs.keys()
                    if (interest_presence_fracs[otu] >= frac and
-                       out_presence_fracs[otu] < frac)]
+                       total_presence_fracs[otu] < frac)]
             for frac in run_config.FRACS}
 
 
@@ -95,7 +89,6 @@ def format_results(res, params, cfg):
                 otu['corrected_pval'], int(frac * 100))
     attachments.append(('%s_results_%s.tsv' % (cfg['name'], params['name']),
                         sign_results))
-    print sign_results
     return attachments
 
 
