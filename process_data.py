@@ -7,7 +7,6 @@ from probability import row_randomize_probability
 from generate_graph import generate_graph
 
 import pipeline
-import pipeline.common
 
 
 class RunPipeline(pipeline.Pipeline):
