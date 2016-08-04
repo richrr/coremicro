@@ -10,7 +10,7 @@ def read_table(table_file):
 
     for vals, id, md in parsed_table.iterObservations():
         otu = md['taxonomy']
-        if otu_data.get(otu):
+        if otu_data.get(otu) is not None:
             otu_data[otu] = [vals[i] + otu_data[otu][i]
                              for i in xrange(samples)]
         else:
