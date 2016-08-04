@@ -88,6 +88,9 @@ def format_results(res, params, cfg):
                 otu['corrected_pval'], int(frac * 100))
     attachments.append(('%s_results_%s.tsv' % (cfg['name'], params['name']),
                         sign_results))
+    if not run_config.IS_PRODUCTION:
+        print "Results for configuration: " + cfg['name']
+        print sign_results
     return attachments
 
 
