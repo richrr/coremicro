@@ -21,7 +21,6 @@ class MainPage(webapp2.RequestHandler):
         mapping_file = self.request.get('groupfile').split('\n')
 
         factor, group = self.request.get('group').split(':')
-        NTIMES = int(self.request.get('random'))
         timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
 
         p_val_adj = self.request.get('pvaladjmethod')
@@ -33,16 +32,14 @@ class MainPage(webapp2.RequestHandler):
 
         user_args = (('You selected the following parameters:' +
                       '\nFactor: %s\nGroup: %s\n' +
-                      'Pval correction: %s\n' +
-                      '# of randomizations: %s\n\n\n')
-                     % (factor, group, p_val_adj, NTIMES))
+                      'Pval correction: %s\n\n\n')
+                     % (factor, group, p_val_adj))
 
         params = {
             'name': name,
             'factor': factor,
             'group': group,
             'p_val_adj': p_val_adj,
-            'ntimes': str(NTIMES),
             'to_email': to_email,
             'timestamp': timestamp,
             'user_args': user_args,
