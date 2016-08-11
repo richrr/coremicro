@@ -34,16 +34,30 @@
           <label for="groupfile">Group file</label><br>
 	  <input type="file" id="groupfile" name="groupfile" size="40" required>
           <p class="help-block">
-            Please specify the <b>tab-delimited</b> file containing sample <-> group info.<br>
-              The group of interest "Person" has to be binary ("Good" vs "Bad").
+            Please specify the <b>tab-delimited</b> file containing sample <-> group info.
           </p>
         </div>
         <div class="form-group">
-          <label for="group">Interest group</label><br>
-	  <input type="text" id="group" name="group" placeholder="Person:Good" size="30" required>
+          <label for="factor">Factor</label><br>
+	  <input type="text" id="factor" name="factor" placeholder="Person" size="30" required>
+        </div>
+        <div class="form-group">
+          <label for="group">Interest Group</label><br>
+	  <input type="text" id="group" name="group" placeholder="Good" size="30" required>
           <p class="help-block">
-            Enter EXACT string of the interest group on which you want core microbiome analysis to be performed.<br>
-            To calculate core microbiome of "Good" under the "Person" group, enter "Person:Good".
+            Enter EXACT string of the factor interest group on which you want core microbiome analysis to be performed.<br>
+            To calculate core microbiome of "Good" under the "Person" factor, enter "Person" for the factor and "Good" for the interest group. Multiple, comma separated, groups (Ex: "Good, Neutral") may be provided, and will be combined into a single interest group. All samples not included in the interest group will be made into the out group.
+          </p>
+        </div>
+        <div class="form-group">
+          <label for="group_name">Interest Group Name</label><br>
+	  <input type="text" id="group_name" name="group_name" placeholder="Good people" size="30" required>
+        </div>
+        <div class="form-group">
+          <label for="out_group_name">Out Group Name</label><br>
+	  <input type="text" id="out_group_name" name="out_group_name" placeholder="Bad people" size="30" required>
+          <p>
+            Names for the interest and out groups. These will be used for labels on the output graphs and tables.
           </p>
         </div>
         <div class="form-group">

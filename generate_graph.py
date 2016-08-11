@@ -3,6 +3,7 @@ import numpy
 import logging
 from collections import namedtuple
 
+from parse_inputs import samples
 import run_config
 
 # matplotlib can't be run on the development server
@@ -31,7 +32,8 @@ def generate_graph(params, inputs, cfg, results):
             attachments.append((
                 '%s_plot_%s_%s.svg' % (cfg['name'], int(frac * 100),
                                        params['name']),
-                make_graph(stats, cfg['group'], cfg['out_group'], frac)
+                make_graph(stats, cfg['group_name'], cfg['out_group_name'],
+                           frac)
             ))
 
         ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
@@ -59,10 +61,10 @@ def get_stats(inputs, otus, i_group, o_group, min_abundance):
         lambda values, id, md: id in otus
     )
     interest = core.filterSamples(
-        lambda values, id, md: id in inputs['mapping_dict'][i_group]
+        lambda values, id, md: id in samples(inputs['mapping_dict'], i_group)
     )
     out = core.filterSamples(
-        lambda values, id, md: id in inputs['mapping_dict'][o_group]
+        lambda values, id, md: id in samples(inputs['mapping_dict'], o_group)
     )
 
     res = list()
@@ -86,7 +88,7 @@ def standard_error(a):
     return numpy.std(a, ddof=1)/numpy.sqrt(len(a))
 
 
-def make_graph(stats, i_group, o_group, frac):
+def make_graph(stats, i_group_name, o_group_name, frac):
     width = 0.35
     ind = [i + width/2 for i in range(len(stats))]
     interest = plt.bar(ind, [s.i_average for s in stats],
@@ -98,7 +100,7 @@ def make_graph(stats, i_group, o_group, frac):
     plt.ylabel('Average Abundance')
     plt.xlabel('Sample ID')
     plt.xticks([i + width for i in ind], range(len(stats)))
-    plt.legend((interest[0], out[0]), (i_group, o_group))
+    plt.legend((interest[0], out[0]), (i_group_name, o_group_name))
     plt.title('Abundance of Core Microbes at %s%% Threshold' %
               int(frac * 100))
 

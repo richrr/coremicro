@@ -1,7 +1,7 @@
 import logging
 
 from email_results import send_error_as_email, send_results_as_email
-from read_table import read_table
+from parse_inputs import read_table, samples
 import run_config
 from probability import row_randomize_probability
 from generate_graph import generate_graph
@@ -38,8 +38,7 @@ def get_signif_otus(params, inputs, cfg, true_res):
                    in inputs['filtered_data'].iterObservations()}
     MAX_PVAL = 0.05
     results = dict()
-
-    n_interest = len(inputs['mapping_dict'][cfg['group']])
+    n_interest = len(samples(inputs['mapping_dict'], cfg['group']))
     results[cfg['name']] = dict()
     true = true_res
     for frac in true:
@@ -63,7 +62,7 @@ def core_otus(params, inputs, cfg):
         otu: float(sum([v > cfg['min_abundance'] for v in vals])) / len(vals)
         for vals, otu, md in inputs['filtered_data'].filterSamples(
                 lambda values, id, md:
-                id in inputs['mapping_dict'][cfg['group']]
+                id in samples(inputs['mapping_dict'], cfg['group'])
         ).iterObservations()
     }
     total_presence_fracs = {

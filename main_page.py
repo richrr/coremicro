@@ -1,9 +1,9 @@
 import webapp2
-import sys
 from time import localtime, strftime
 
 from email_results import send_error_as_email
 from process_data import RunPipeline
+from parse_inputs import get_categ_samples_dict
 import run_config
 
 
@@ -20,7 +20,10 @@ class MainPage(webapp2.RequestHandler):
         data = self.request.get('datafile')
         mapping_file = self.request.get('groupfile').split('\n')
 
-        factor, group = self.request.get('group').split(':')
+        factor = self.request.get('factor')
+        group = map(lambda s: s.strip(), self.request.get('group').split(','))
+        group_name = self.request.get('group_name')
+        out_group_name = self.request.get('out_group_name')
         timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
 
         p_val_adj = self.request.get('pvaladjmethod')
@@ -62,8 +65,10 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': group,
                 'out_group': out_group,
+                'group_name': group_name,
+                'out_group_name': out_group_name,
                 'min_abundance': min_abundance,
-                'name': 'interest'
+                'name': group_name
             }
         ]
 
@@ -72,8 +77,10 @@ class MainPage(webapp2.RequestHandler):
                 'factor': factor,
                 'group': out_group,
                 'out_group': group,
+                'group_name': out_group_name,
+                'out_group_name': group_name,
                 'min_abundance': min_abundance,
-                'name': 'out'
+                'name': out_group_name
                 }
             )
 
@@ -95,49 +102,26 @@ def validate_inputs(params, inputs):
     group = params['group']
 
     labels = mapping_file[0].strip().strip('#').split(run_config.DELIM)
-    indx_sampleid = indx_categ = 0
 
     errors_list = list()
 
-    if 'SampleID' in labels:
-        indx_sampleid = labels.index('SampleID')
-    else:
+    if 'SampleID' not in labels:
         errors_list.append('"SampleID" not in the headers of the sample ' +
                            '<-> group info file')
-    if factor in labels:
-        indx_categ = labels.index(factor)
-    else:
+    if factor not in labels:
         errors_list.append(('"%s" not in the headers of the sample <-> ' +
                             'group info file') % factor)
-    mapping_dict = get_categ_samples_dict(mapping_file, indx_categ,
-                                          indx_sampleid)
-    groups = mapping_dict.keys()
-    if (len(groups) != 2):
-        errors_list.append('Following code divides samples ' +
-                           'in >TWO groups. Change the mapping file ' +
-                           'to only have two groups (e.g. A vs D)\n')
-    if group not in groups:
-        errors_list.append('Interest group is not present in groupfile')
-        out_group = ''
+    mapping_dict = get_categ_samples_dict(mapping_file, factor)
+    for l in group:
+        if l not in mapping_dict.keys():
+            errors_list.append(
+                'Interest group label %s is not in groupfile' % l
+            )
     else:
-        groups.remove(group)
-        out_group = groups[0]
+        out_group = mapping_dict.keys()
+        [out_group.remove(l) for l in group]
 
     if params['random_opt'] not in ['row_wise', 'column_wise',
                                     'otu_label', 'samp_annot']:
         errors_list.append('Randomization option not valid')
     return (errors_list, mapping_dict, out_group)
-
-
-def get_categ_samples_dict(mapping_info_list, index_categ, indx_sampleid):
-    local_dict = dict()
-    for l in mapping_info_list:
-        if not l or l.strip()[0] == '#':
-            continue
-        key, val = map(l.strip().split(run_config.DELIM).__getitem__,
-                       [index_categ, indx_sampleid])
-        if key in local_dict:
-            local_dict[key].append(val)
-        else:
-            local_dict[key] = [val]
-    return local_dict
