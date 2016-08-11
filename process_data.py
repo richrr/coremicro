@@ -1,33 +1,25 @@
-from itertools import compress
-
-from process_results import get_final_results, format_results
-
 import logging
-import numpy
 
 from email_results import send_error_as_email, send_results_as_email
-from read_table import read_table
+from parse_inputs import read_table, samples
 import run_config
 from probability import row_randomize_probability
 from generate_graph import generate_graph
 
-
 import pipeline
-import pipeline.common
 
 
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
+        inputs['filtered_data'] = read_table(inputs['data'])
 
-        true_res = run_data(inputs['mapping_dict'],
-                            read_table(inputs['data']),
-                            params['run_cfgs'])
-        pval_res = get_random_results(params, inputs)
-        results = get_final_results(true_res, pval_res, params)
         attachments = list()
-        attachments += format_results(results, params)
-        attachments += generate_graph(params, inputs, results)
+        for cfg in params['run_cfgs']:
+            results = get_signif_otus(params, inputs, cfg,
+                                      core_otus(params, inputs, cfg))
+            attachments += format_results(results, params, cfg)
+            attachments += generate_graph(params, inputs, cfg, results)
         send_results_as_email(params, attachments)
 
     def finalized(self):
@@ -41,41 +33,90 @@ class RunPipeline(pipeline.Pipeline):
         self.cleanup()
 
 
-def get_random_results(params, inputs):
-    data = read_table(inputs['data'])
+def get_signif_otus(params, inputs, cfg, true_res):
+    otu_to_vals = {otu: vals for vals, otu, md
+                   in inputs['filtered_data'].iterObservations()}
+    MAX_PVAL = 0.05
     results = dict()
-    for cfg in params['run_cfgs']:
-        n_interest = len(inputs['mapping_dict'][cfg['group']])
-        results[cfg['name']] = {int(100 * frac): dict()
-                                for frac in run_config.FRACS}
-        for vals, otu, md in data.iterObservations():
-            for frac, pval in zip(run_config.FRACS,
-                                  row_randomize_probability(
-                                      vals, n_interest,
-                                      cfg['min_abundance'])):
-                results[cfg['name']][int(frac * 100)][otu] = pval
+    n_interest = len(samples(inputs['mapping_dict'], cfg['group']))
+    results[cfg['name']] = dict()
+    true = true_res
+    for frac in true:
+        pvals = [row_randomize_probability(otu_to_vals[otu],
+                                           n_interest, frac,
+                                           cfg['min_abundance'])
+                 for otu in true[frac]]
+        pvals_corrected = correct_pvalues_for_multiple_testing(
+            pvals, params['p_val_adj'])
+        results[frac] = [{'otu': otu,
+                          'pval': pvals[i],
+                          'corrected_pval': pvals_corrected[i],
+                          'threshold': frac}
+                         for i, otu in enumerate(true[frac])
+                         if pvals_corrected[i] <= MAX_PVAL]
     return results
 
 
-def run_data(mapping, data, run_cfgs):
-    res = dict()
-    for cfg in run_cfgs:
-        res[cfg['name']] = get_core(mapping, data, cfg['group'],
-                                    min_abundance=cfg['min_abundance'])
-    return res
-
-
-def get_core(mapping, data, group, min_abundance=0):
-    # a table of presence/absence data for just the interest group samples
-    interest = data.filterSamples(lambda values, id, md: id in mapping[group])
-    interest_samples = len(interest.SampleIds)
-    presence_counts = interest.transformSamples(
-        lambda l, id, md: numpy.array([v > min_abundance for v in l])
-    ).sum(axis='observation')
-    presence_fracs = [float(count) / interest_samples
-                      for count in presence_counts]
-    otus = [observation[1] for observation in interest.iterObservations()]
-    return {int(frac * 100):
-            list(compress(otus, [presence >= frac
-                                 for presence in presence_fracs]))
+def core_otus(params, inputs, cfg):
+    interest_presence_fracs = {
+        otu: float(sum([v > cfg['min_abundance'] for v in vals])) / len(vals)
+        for vals, otu, md in inputs['filtered_data'].filterSamples(
+                lambda values, id, md:
+                id in samples(inputs['mapping_dict'], cfg['group'])
+        ).iterObservations()
+    }
+    total_presence_fracs = {
+        otu: float(sum([v > cfg['min_abundance'] for v in vals])) / len(vals)
+        for vals, otu, md in inputs['filtered_data'].iterObservations()
+    }
+    return {frac: [otu for otu in interest_presence_fracs.keys()
+                   if (interest_presence_fracs[otu] >= frac and
+                       total_presence_fracs[otu] < frac)]
             for frac in run_config.FRACS}
+
+
+def format_results(res, params, cfg):
+    attachments = list()
+    sign_results = (('OTU\tpval\t%s ' +
+                     'corrected pval\tthreshold\n')
+                    % params['p_val_adj'])
+    for frac in reversed(sorted(res.keys())):
+        for otu in res[frac]:
+            sign_results += '%s\t%s\t%s\t%s\n' % (
+                otu['otu'], otu['pval'],
+                otu['corrected_pval'], int(frac * 100))
+    attachments.append(('%s_results_%s.tsv' % (cfg['name'], params['name']),
+                        sign_results))
+    if not run_config.IS_PRODUCTION:
+        print "Results for configuration: " + cfg['name']
+        print sign_results
+    return attachments
+
+
+def correct_pvalues_for_multiple_testing(pvalues, correction_type):
+    n = len(pvalues)
+    if correction_type == 'bf':  # Bonferroni
+        new_pvalues = [n * p for p in pvalues]
+    elif correction_type == 'bf-h':  # Bonferroni-Holm
+        values = sorted([(p, i) for i, p in enumerate(pvalues)])
+        new_pvalues = [None] * n
+        for rank, (p, i) in enumerate(values):
+            new_pvalues[i] = (n - rank) * p
+    elif correction_type == 'b-h':  # Benjamini-Hochberg
+        values = list(reversed(sorted(
+            [(p, i) for i, p in enumerate(pvalues)]
+        )))
+        adjusted_vals = [float(n)/(n - i) * p
+                         for i, (p, index) in enumerate(values)]
+        for i in xrange(n - 1):
+            if adjusted_vals[i] < adjusted_vals[i + 1]:
+                adjusted_vals[i + 1] = adjusted_vals[i]
+        new_pvalues = [None] * n
+        for i, (p, index) in enumerate(values):
+            new_pvalues[index] = adjusted_vals[i]
+    elif correction_type == 'none':
+        new_pvalues = pvalues[:]
+    else:
+        logging.warn('Invalid correction type of "%s" given to correct_pvalues'
+                     % correction_type)
+    return new_pvalues
