@@ -3,7 +3,9 @@ import logging
 from email_results import send_error_as_email, send_results_as_email
 from parse_inputs import read_table, samples
 import run_config
-from probability import row_randomize_probability
+from probability import (row_randomize_probability,
+                         column_randomize_probability,
+                         full_table_randomize_probability)
 from generate_graph import generate_graph
 
 import pipeline
@@ -34,18 +36,41 @@ class RunPipeline(pipeline.Pipeline):
 
 
 def get_signif_otus(params, inputs, cfg, true_res):
-    otu_to_vals = {otu: vals for vals, otu, md
-                   in inputs['filtered_data'].iterObservations()}
+    if params['randomization'] == 'row':
+        otu_to_vals = {otu: vals for vals, otu, md
+                       in inputs['filtered_data'].iterObservations()}
+    elif params['randomization'] == 'column':
+        interest_columns = [vals for vals, id, md
+                            in inputs['filtered_data'].iterSamples()
+                            if id in samples(inputs['mapping_dict'],
+                                             cfg['group'])]
+    elif params['randomization'] == 'table':
+        table_vals = [vals for vals, id, md
+                      in inputs['filtered_data'].iterObservations()]
     MAX_PVAL = 0.05
     results = dict()
     n_interest = len(samples(inputs['mapping_dict'], cfg['group']))
     results[cfg['name']] = dict()
     true = true_res
     for frac in true:
-        pvals = [row_randomize_probability(otu_to_vals[otu],
-                                           n_interest, frac,
-                                           cfg['min_abundance'])
-                 for otu in true[frac]]
+        logging.info('Starting frac %f' % frac)
+        if params['randomization'] == 'row':
+            pvals = [row_randomize_probability(otu_to_vals[otu],
+                                               n_interest, frac,
+                                               cfg['min_abundance'])
+                     for otu in true[frac]]
+        elif params['randomization'] == 'column':
+            # pvalue is same for all in the same frac
+            pvals = [
+                column_randomize_probability(interest_columns, frac,
+                                             cfg['min_abundance'])
+            ] * len(true[frac])
+        elif params['randomization'] == 'table':
+            pvals = [
+                full_table_randomize_probability(table_vals,
+                                                 n_interest, frac,
+                                                 cfg['min_abundance'])
+            ] * len(true[frac])
         pvals_corrected = correct_pvalues_for_multiple_testing(
             pvals, params['p_val_adj'])
         results[frac] = [{'otu': otu,
