@@ -1,10 +1,17 @@
 import webapp2
+import jinja2
+import os
 from time import localtime, strftime
 
-from email_results import send_error_as_email
 from process_data import RunPipeline
-from parse_inputs import get_categ_samples_dict
+from parse_inputs import get_categ_samples_dict, read_table
 import run_config
+
+
+JINJA_ENVIRONMENT = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
+    extensions=['jinja2.ext.autoescape'],
+    autoescape=True)
 
 
 class MainPage(webapp2.RequestHandler):
@@ -12,8 +19,7 @@ class MainPage(webapp2.RequestHandler):
         page = open('index.html', 'r')
         MAIN_PAGE_HTML = page.read()
         page.close()
-        upload_url = '/'
-        self.response.write(MAIN_PAGE_HTML.format(upload_url))
+        self.response.write(MAIN_PAGE_HTML)
 
     def post(self):
         name = self.request.get('name')
@@ -86,15 +92,16 @@ class MainPage(webapp2.RequestHandler):
             )
 
         if len(errors_list) > 0:
-            send_error_as_email(params, '\n'.join(errors_list))
-            # TODO: Return form with error marked
-            self.redirect('/')
+            template = JINJA_ENVIRONMENT.get_template('result.html.jinja')
+            self.response.write(template.render(errors=errors_list,
+                                                sucess=False))
             return
 
         pipeline = RunPipeline(params, inputs)
         pipeline.start()
 
-        self.redirect('/')
+        template = JINJA_ENVIRONMENT.get_template('result.html.jinja')
+        self.response.write(template.render(user_email=to_email, sucess=True))
 
 
 def validate_inputs(params, inputs):
@@ -118,10 +125,18 @@ def validate_inputs(params, inputs):
             errors_list.append(
                 'Interest group label %s is not in groupfile' % l
             )
-    else:
+
+    try:
         out_group = mapping_dict.keys()
         [out_group.remove(l) for l in group]
+    except ValueError:
+        pass                    # already handled previously
 
     if params['randomization'] not in ['row', 'column', 'table']:
         errors_list.append('Randomization option not valid')
+
+    try:
+        read_table(inputs['data'])
+    except ValueError as e:
+        errors_list.append('Datafile could not be read: %s' % e.message)
     return (errors_list, mapping_dict, out_group)

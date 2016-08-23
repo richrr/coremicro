@@ -1,7 +1,7 @@
 import logging
 
 from email_results import send_error_as_email, send_results_as_email
-from parse_inputs import read_table, samples
+from parse_inputs import samples, read_table
 import run_config
 from probability import (row_randomize_probability,
                          column_randomize_probability,
