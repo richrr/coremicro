@@ -9,17 +9,16 @@ import run_config
 
 
 JINJA_ENVIRONMENT = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
+    loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__),
+                                                '../static/')),
     extensions=['jinja2.ext.autoescape'],
     autoescape=True)
 
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
-        page = open('index.html', 'r')
-        MAIN_PAGE_HTML = page.read()
-        page.close()
-        self.response.write(MAIN_PAGE_HTML)
+        template = JINJA_ENVIRONMENT.get_template('index.html')
+        self.response.write(template.render())
 
     def post(self):
         name = self.request.get('name')

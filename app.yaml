@@ -14,9 +14,10 @@ handlers:
 
 - url: /static
   static_dir: static
+  application_readable: true
 
 - url: /.*
-  script: coremic.app
+  script: src.coremic.app
 
 libraries:
 - name: webapp2
