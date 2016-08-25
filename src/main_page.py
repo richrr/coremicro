@@ -31,7 +31,6 @@ class MainPage(webapp2.RequestHandler):
         out_group_name = self.request.get('out_group_name')
         timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
 
-        randomization = self.request.get('randomization')
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
         min_abundance = float(self.request.get('min_abundance'))
@@ -40,9 +39,8 @@ class MainPage(webapp2.RequestHandler):
 
         user_args = (('You selected the following parameters:' +
                       '\nFactor: %s\nGroup: %s\n' +
-                      '\nRandomization: %s\n' +
                       'Pval correction: %s\n\n\n')
-                     % (factor, group, randomization, p_val_adj))
+                     % (factor, group, p_val_adj))
 
         params = {
             'name': name,
@@ -53,7 +51,6 @@ class MainPage(webapp2.RequestHandler):
             'timestamp': timestamp,
             'user_args': user_args,
             'include_out': include_out,
-            'randomization': randomization,
         }
 
         inputs = {
@@ -130,9 +127,6 @@ def validate_inputs(params, inputs):
         [out_group.remove(l) for l in group]
     except ValueError:
         pass                    # already handled previously
-
-    if params['randomization'] not in ['row', 'column', 'table']:
-        errors_list.append('Randomization option not valid')
 
     try:
         read_table(inputs['data'])
