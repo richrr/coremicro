@@ -150,6 +150,12 @@
             include the results of running the analysis with "Neutral, Bad"
             as the interest group.</dd>
 
+          <dt>Maximum Adjusted <i>p</i>-Value</dt>
+          <dd>The maximum <i>p</i>-value to keeep after adjustment for multiple
+            testing, I.E. the highest allowable probability of a false positive.
+            The exact interpretation for this value will depend on which
+            <i>p</i>-value adjustment method is used.
+          
           <dt>Minimum Abundance</dt>
           <dd>The minimum abundance a measurement must have to be considered
             present. This can be a relative or absolute abundance depending on
@@ -158,7 +164,14 @@
             has a non-zero abundance. This option can be helpful in cases where
             noise can result in small, non-negative readings for measurements
             that should, ideally, be zero.</dd>
-            
+
+          <dt><i>p</i>-Value Adjustment Method</dt>
+          <dd>What methodology to use to adjust the results to compensate for
+            multiple testing. Bonferroni and Bonferroni-Holm correct for the
+            probability that there will be one or more false positives in the
+            results within a specific threshold. Benjamini Hochberg corrects
+            for the proportion of false discoveries.</dd>
+          
           <dt>Email</dt>
           <dd>The email address where you want your results emailed. <b>Your
               results are NOT stored;</b> you will only get these results via

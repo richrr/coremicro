@@ -36,7 +36,6 @@ class RunPipeline(pipeline.Pipeline):
 def get_signif_otus(params, inputs, cfg, true_res):
     otu_to_vals = {otu: vals for vals, otu, md
                    in inputs['filtered_data'].iterObservations()}
-    MAX_PVAL = 0.05
     results = dict()
     n_interest = len(samples(inputs['mapping_dict'], cfg['group']))
     results[cfg['name']] = dict()
@@ -54,7 +53,7 @@ def get_signif_otus(params, inputs, cfg, true_res):
                           'corrected_pval': pvals_corrected[i],
                           'threshold': frac}
                          for i, otu in enumerate(true[frac])
-                         if pvals_corrected[i] <= MAX_PVAL]
+                         if pvals_corrected[i] <= params['max_p']]
     return results
 
 

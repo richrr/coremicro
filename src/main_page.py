@@ -33,6 +33,7 @@ class MainPage(webapp2.RequestHandler):
 
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
+        max_p = float(self.request.get('max_p'))
         min_abundance = float(self.request.get('min_abundance'))
 
         to_email = self.request.get('email')
@@ -51,6 +52,7 @@ class MainPage(webapp2.RequestHandler):
             'timestamp': timestamp,
             'user_args': user_args,
             'include_out': include_out,
+            'max_p': max_p,
         }
 
         inputs = {
@@ -132,4 +134,10 @@ def validate_inputs(params, inputs):
         read_table(inputs['data'])
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)
+
+    if params['max_p'] < 0:
+        errors_list.append('Maximum p-value can not be negative')
+    elif params['max_p'] > 1:
+        errors_list.append('Maximum p-value can not be greater than one')
+
     return (errors_list, mapping_dict, out_group)
