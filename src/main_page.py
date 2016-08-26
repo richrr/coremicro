@@ -102,6 +102,12 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(template.render(user_email=to_email, sucess=True))
 
 
+# Set up web server
+app = webapp2.WSGIApplication([
+    ('/', MainPage)
+], debug=True)
+
+
 def validate_inputs(params, inputs):
     mapping_file = inputs['mapping_file']
     factor = params['factor']
