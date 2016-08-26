@@ -1,18 +1,18 @@
 import math
 
 
-def row_randomize_probability(vals, n_interest, frac, min_abundance=0):
+def row_randomize_probability(data, frac):
     """The probability that if n_interest valsues are chosen from vals at least
     frac percent will be above min_abundance
     """
-    present = sum([v > min_abundance for v in vals])
-    total = len(vals)
-    min_needed = int(math.ceil(frac * n_interest))
-    return (sum([nCr(present, need) *
-                 nCr(total - present, n_interest - need)
-                 for need in xrange(min_needed, min(present,
-                                                    n_interest) + 1)]) /
-            nCr(total, n_interest))
+    min_needed = int(math.ceil(frac * data.n_interest))
+    return (sum([nCr(data.present, need) *
+                 nCr(data.total - data.present,
+                     data.n_interest - need)
+                 for need in xrange(min_needed,
+                                    min(data.present,
+                                        data.n_interest) + 1)]) /
+            nCr(data.total, data.n_interest))
 
 
 def nCr(n, r):
