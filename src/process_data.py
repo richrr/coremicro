@@ -18,11 +18,8 @@ class RunPipeline(pipeline.Pipeline):
 
         attachments = list()
         for cfg in params['run_cfgs']:
-            data = get_data_summary(inputs['filtered_data'],
-                                    inputs['mapping_dict'],
-                                    cfg['group'],
-                                    cfg['min_abundance'])
-            results = get_signif_otus(params, data, cfg)
+            
+            results = get_signif_otus(inputs, cfg)
             attachments += format_results(results, params, cfg)
             attachments += generate_graph(params, inputs, cfg, results)
         send_results_as_email(params, attachments)
@@ -38,12 +35,16 @@ class RunPipeline(pipeline.Pipeline):
         self.cleanup()
 
 
-def get_signif_otus(params, data, cfg):
+def get_signif_otus(inputs, cfg):
     """Takes the set of OTUs at each fractional threshold that satisfy the
     inclusion requirement that they be present at at least the threshold in the
     interest group and at less than that threshold across all samples,
     calculates the p-value for each OTU, and gives the list of OTUs found to be
     significant after correction for multiple testing"""
+    data = get_data_summary(inputs['filtered_data'],
+                            inputs['mapping_dict'],
+                            cfg['group'],
+                            cfg['min_abundance'])
     results = dict()
     core = {frac: [otu for otu in data.keys()
                    if (data[otu].i_present /
@@ -54,13 +55,13 @@ def get_signif_otus(params, data, cfg):
         logging.info('Starting frac %f' % frac)
         pvals = [row_randomize_probability(data[otu], frac)
                  for otu in core[frac]]
-        pvals_corrected = correct_pvalues(pvals, params['p_val_adj'])
+        pvals_corrected = correct_pvalues(pvals, cfg['p_val_adj'])
         results[frac] = [{'otu': otu,
                           'pval': pvals[i],
                           'corrected_pval': pvals_corrected[i],
                           'threshold': frac}
                          for i, otu in enumerate(core[frac])
-                         if pvals_corrected[i] <= params['max_p']]
+                         if pvals_corrected[i] <= cfg['max_p']]
     return results
 
 
@@ -69,7 +70,7 @@ def format_results(res, params, cfg):
     """
     sign_results = (('OTU\tpval\t%s ' +
                      'corrected pval\tthreshold\n')
-                    % params['p_val_adj'])
+                    % cfg['p_val_adj'])
     for frac in reversed(sorted(res.keys())):
         for otu in res[frac]:
             sign_results += '%s\t%s\t%s\t%s\n' % (
@@ -78,5 +79,5 @@ def format_results(res, params, cfg):
     if not run_config.IS_PRODUCTION:
         print "Results for configuration: " + cfg['name']
         print sign_results
-    return [('%s_results_%s.tsv' % (cfg['name'], params['name']),
+    return [('%s_results_%s.tsv' % (cfg['name'], params['run_name']),
             sign_results)]

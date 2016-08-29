@@ -49,15 +49,26 @@ def get_data_summary(table, mapping_dict, i_group, min_abundance):
             for otu in i_vals.keys()}
 
 
+def samples(mapping_dict, group):
+    """Get the sample ids for the given group"""
+    return [otu for g in group for otu in mapping_dict[g]]
+
+
+def num_present(vals, min_abundance):
+    """Get the number of values in vals that are greater than min_abundance"""
+    return sum([v > min_abundance for v in vals])
+
+
 def get_categ_samples_dict(mapping_info_list, factor):
-    """Turn the groupfile in to a dictionary frob factor labels to sample ids
+    """Turn the groupfile in to a dictionary from factor labels to sample ids
     """
+    # It is assumed that the first line is the header
     labels = mapping_info_list[0].strip().strip('#').split(run_config.DELIM)
     index_sampleid = labels.index('SampleID')
     index_categ = labels.index(factor)
     local_dict = dict()
     for l in mapping_info_list:
-        if not l or l.strip()[0] == '#':
+        if not l or l.strip()[0] == '#':  # Line is blank or comment
             continue
         key, val = map(l.strip().split(run_config.DELIM).__getitem__,
                        [index_categ, index_sampleid])
@@ -68,12 +79,43 @@ def get_categ_samples_dict(mapping_info_list, factor):
     return local_dict
 
 
-def samples(mapping_dict, group):
-    """Get the sample ids for the given group
-"""
-    return [otu for g in group for otu in mapping_dict[g]]
+def validate_inputs(params, inputs):
+    """Validate that the given inputs are usable"""
+    mapping_file = inputs['mapping_file']
+    factor = params['factor']
+    group = params['group']
 
+    labels = mapping_file[0].strip().strip('#').split(run_config.DELIM)
 
-def num_present(vals, min_abundance):
-    """Get the number of values in vals that are greater than min_abundance"""
-    return sum([v > min_abundance for v in vals])
+    errors_list = list()
+
+    if 'SampleID' not in labels:
+        errors_list.append('"SampleID" not in the headers of the sample ' +
+                           '<-> group info file')
+    if factor not in labels:
+        errors_list.append(('"%s" not in the headers of the sample <-> ' +
+                            'group info file') % factor)
+    mapping_dict = get_categ_samples_dict(mapping_file, factor)
+    for l in group:
+        if l not in mapping_dict.keys():
+            errors_list.append(
+                'Interest group label %s is not in groupfile' % l
+            )
+
+    try:
+        out_group = mapping_dict.keys()
+        [out_group.remove(l) for l in group]
+    except ValueError:
+        pass                    # already handled previously
+
+    try:
+        read_table(inputs['data'])
+    except ValueError as e:
+        errors_list.append('Datafile could not be read: %s' % e.message)
+
+    if params['max_p'] < 0:
+        errors_list.append('Maximum p-value can not be negative')
+    elif params['max_p'] > 1:
+        errors_list.append('Maximum p-value can not be greater than one')
+
+    return (errors_list, mapping_dict, out_group)

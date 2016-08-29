@@ -4,8 +4,7 @@ import os
 from time import localtime, strftime
 
 from process_data import RunPipeline
-from parse_inputs import get_categ_samples_dict, read_table
-import run_config
+from parse_inputs import validate_inputs
 
 
 JINJA_ENVIRONMENT = jinja2.Environment(
@@ -21,7 +20,7 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(template.render())
 
     def post(self):
-        name = self.request.get('name')
+        run_name = self.request.get('name')
         data = self.request.get('datafile')
         mapping_file = self.request.get('groupfile').split('\n')
 
@@ -44,15 +43,15 @@ class MainPage(webapp2.RequestHandler):
                      % (factor, group, p_val_adj))
 
         params = {
-            'name': name,
+            'run_name': run_name,
             'factor': factor,
             'group': group,
-            'p_val_adj': p_val_adj,
             'to_email': to_email,
             'timestamp': timestamp,
             'user_args': user_args,
             'include_out': include_out,
             'max_p': max_p,
+            'min_abundance': min_abundance,
         }
 
         inputs = {
@@ -73,7 +72,9 @@ class MainPage(webapp2.RequestHandler):
                 'group_name': group_name,
                 'out_group_name': out_group_name,
                 'min_abundance': min_abundance,
-                'name': group_name
+                'name': group_name,
+                'max_p': max_p,
+                'p_val_adj': p_val_adj,
             }
         ]
 
@@ -85,7 +86,9 @@ class MainPage(webapp2.RequestHandler):
                 'group_name': out_group_name,
                 'out_group_name': group_name,
                 'min_abundance': min_abundance,
-                'name': out_group_name
+                'name': out_group_name,
+                'max_p': max_p,
+                'p_val_adj': p_val_adj,
                 }
             )
 
@@ -106,44 +109,3 @@ class MainPage(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([
     ('/', MainPage)
 ], debug=True)
-
-
-def validate_inputs(params, inputs):
-    mapping_file = inputs['mapping_file']
-    factor = params['factor']
-    group = params['group']
-
-    labels = mapping_file[0].strip().strip('#').split(run_config.DELIM)
-
-    errors_list = list()
-
-    if 'SampleID' not in labels:
-        errors_list.append('"SampleID" not in the headers of the sample ' +
-                           '<-> group info file')
-    if factor not in labels:
-        errors_list.append(('"%s" not in the headers of the sample <-> ' +
-                            'group info file') % factor)
-    mapping_dict = get_categ_samples_dict(mapping_file, factor)
-    for l in group:
-        if l not in mapping_dict.keys():
-            errors_list.append(
-                'Interest group label %s is not in groupfile' % l
-            )
-
-    try:
-        out_group = mapping_dict.keys()
-        [out_group.remove(l) for l in group]
-    except ValueError:
-        pass                    # already handled previously
-
-    try:
-        read_table(inputs['data'])
-    except ValueError as e:
-        errors_list.append('Datafile could not be read: %s' % e.message)
-
-    if params['max_p'] < 0:
-        errors_list.append('Maximum p-value can not be negative')
-    elif params['max_p'] > 1:
-        errors_list.append('Maximum p-value can not be greater than one')
-
-    return (errors_list, mapping_dict, out_group)

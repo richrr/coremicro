@@ -10,6 +10,10 @@ import run_config
 if run_config.IS_PRODUCTION:
     import matplotlib.pyplot as plt
 
+# Namedtuple to hold statistics calculated for otus
+Stats = namedtuple('Stats', ['otu', 'i_average', 'i_frequency', 'i_error',
+                             'o_average', 'o_frequency', 'o_error'])
+
 
 def generate_graph(params, inputs, cfg, results):
     attachments = list()
@@ -31,7 +35,7 @@ def generate_graph(params, inputs, cfg, results):
         if run_config.IS_PRODUCTION:
             attachments.append((
                 '%s_plot_%s_%s.svg' % (cfg['name'], int(frac * 100),
-                                       params['name']),
+                                       params['run_name']),
                 make_graph(stats, cfg['group_name'], cfg['out_group_name'],
                            frac)
             ))
@@ -47,7 +51,7 @@ def generate_graph(params, inputs, cfg, results):
                 stats[i].otu)
 
         attachments.append(('%s_plot_labels_%s_%s.tsv' %
-                            (cfg['name'], int(frac * 100), params['name']),
+                            (cfg['name'], int(frac * 100), params['run_name']),
                             ref_text))
     if not run_config.IS_PRODUCTION:
         logging.warn('Graphs not generated because in development mode')
@@ -55,8 +59,6 @@ def generate_graph(params, inputs, cfg, results):
 
 
 def get_stats(inputs, otus, i_group, o_group, min_abundance):
-    Stats = namedtuple('Stats', ['otu', 'i_average', 'i_frequency', 'i_error',
-                                 'o_average', 'o_frequency', 'o_error'])
     core = inputs['filtered_data'].filterObservations(
         lambda values, id, md: id in otus
     )

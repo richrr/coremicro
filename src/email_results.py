@@ -6,7 +6,7 @@ import logging
 
 def send_results_as_email(params, attachments):
     subj = "Your data from %s with name %s has been processed" % (
-        params['timestamp'], params['name'])
+        params['timestamp'], params['run_name'])
     msg_str = """
 Dear User:
 
@@ -28,7 +28,7 @@ The Core Microbiome Team
 def send_error_as_email(params, error):
     logging.warn(error)
     subj = 'There was an error in processing your data from %s with name %s'\
-           % (params['timestamp'], params['name'])
+           % (params['timestamp'], params['run_name'])
     msg_str = """
 Dear User:
 
