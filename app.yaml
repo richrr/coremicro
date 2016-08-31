@@ -17,7 +17,7 @@ handlers:
   application_readable: true
 
 - url: /.*
-  script: src.main_page.app
+  script: src.routing.app
 
 libraries:
 - name: webapp2

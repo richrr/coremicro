@@ -1,22 +1,14 @@
 import webapp2
-import jinja2
-import os
 from time import localtime, strftime
 
+import run_config
 from process_data import RunPipeline
 from parse_inputs import validate_inputs
 
 
-JINJA_ENVIRONMENT = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__),
-                                                '../static/')),
-    extensions=['jinja2.ext.autoescape'],
-    autoescape=True)
-
-
 class MainPage(webapp2.RequestHandler):
     def get(self):
-        template = JINJA_ENVIRONMENT.get_template('index.html')
+        template = run_config.JINJA_ENVIRONMENT.get_template('index.html')
         self.response.write(template.render())
 
     def post(self):
@@ -92,8 +84,8 @@ class MainPage(webapp2.RequestHandler):
                 }
             )
 
+        template = run_config.JINJA_ENVIRONMENT.get_template('result.html')
         if len(errors_list) > 0:
-            template = JINJA_ENVIRONMENT.get_template('result.html.jinja')
             self.response.write(template.render(errors=errors_list,
                                                 sucess=False))
             return
@@ -101,11 +93,4 @@ class MainPage(webapp2.RequestHandler):
         pipeline = RunPipeline(params, inputs)
         pipeline.start()
 
-        template = JINJA_ENVIRONMENT.get_template('result.html.jinja')
         self.response.write(template.render(user_email=to_email, sucess=True))
-
-
-# Set up web server
-app = webapp2.WSGIApplication([
-    ('/', MainPage)
-], debug=True)

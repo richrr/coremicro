@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}>Submission Results{% endblock %}
+
+{% block content %}
+{% if sucess %}
+<h1>Submission Sucessful</h1>
+<p>
+  Your results will be emailed to <a href="mail:{{ user_email }}">
+    {{user_email}}</a>
+  soon.
+</p>
+<p>Click <a href="/">here</a> to return to the form.</p>
+{% else %}
+<h1> There were one or more errors with your submission</h1>
+<p>
+  {% for error in errors %}
+  {{ error }}<br>
+  {% endfor %}
+</p>
+<p>
+  Use your browser's back button to return to the form and fix these errors.
+</p>
+{% endif %}
+{% endblock %}
