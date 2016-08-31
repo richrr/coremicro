@@ -3,6 +3,7 @@ import re
 from colour import Color
 import sys
 import csv
+import os
 
 # Feature name to mark nodes in the core OTUs
 IN_CORE_FEATURE = 'in_core'
@@ -182,8 +183,14 @@ def parse_output(filename):
 if __name__ == '__main__':
     if len(sys.argv) not in [4, 5]:
         print("""Usage
-        visualize_core.py <core.tsv> <out.tsv> <out.png> [threshold]
+visualize_core.py <interest_core.tsv> <out_core.tsv> <output.png> [threshold]
+
+<interest_core.tsv> --- The file containing the core of the interest group
+<out_core.tsv> --- The file containing the core of the out group
+<output.png> --- The image file to output to
+[threshold] --- (optional) The minimum threshold to include. 0 by default
 """)
+    os.chdir(os.path.dirname(sys.argv[0]))
     core = parse_output(sys.argv[1])
     out = parse_output(sys.argv[2])
     if len(sys.argv) == 5:
