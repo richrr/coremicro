@@ -2,6 +2,7 @@ from ete3 import Tree, TreeStyle, faces, TextFace, RectFace
 from colour import Color
 import sys
 import csv
+import argparse
 
 # Feature name to mark nodes in the core OTUs
 GROUP_FEATURE = 'group'
@@ -29,6 +30,7 @@ def generate_layout(signif_color, insignif_color, interest_group):
         # Label the leaves
         if node.is_leaf():
             color = 'Black'
+            # If the node is in the interest group
             if getattr(node, GROUP_FEATURE) == interest_group:
                 pval = float(getattr(node, CORRECTED_P_VAL_FEATURE))
                 pval_color = interpolate_color(signif_color, insignif_color,
@@ -166,29 +168,36 @@ def add_otu(otu, tree, group):
     })
 
 
+def setup_parser():
+    parser = argparse.ArgumentParser(
+        description='Generate a tree visualization of the output from coremic')
+    parser.add_argument(
+        'interest_core',
+        help='The tsv file containing the core of the interest group')
+    parser.add_argument(
+        'out_core',
+        help='The tsv file containing the core of the out group')
+    parser.add_argument(
+        'output',
+        help='The image file to output the result to')
+    parser.add_argument(
+        '-t', '--threshold', type=float, default=0,
+        help='The minimum threshold to include in the tree. Defaults to zero.')
+    parser.add_argument(
+        '-p', '--max_p', type=float, default=0.05,
+        help=('The maximum adjusted p-value used in the analysis. ' +
+              'This is used to scale the coloring of the p-value indicators.'))
+    return parser
+
+
 if __name__ == '__main__':
-    if len(sys.argv) not in [4, 5]:
-        print("""Usage
-visualize_core.py <interest_core.tsv> <out_core.tsv> <output.png> [threshold]
-
-<interest_core.tsv> --- The file containing the core of the interest group
-<out_core.tsv> --- The file containing the core of the out group
-<output.png> --- The image file to output to
-[threshold] --- (optional) The minimum threshold to include. 0 by default
-""")
-    i_core = parse_output(sys.argv[1])
-    o_core = parse_output(sys.argv[2])
-    if len(sys.argv) == 5:
-        threshold = int(sys.argv[4])
-    else:
-        threshold = 0
-
-    print 'building tree'
+    parser = setup_parser()
+    args = parser.parse_args()
+    i_core = parse_output(args.interest_core)
+    o_core = parse_output(args.out_core)
     tree = Tree()
-    add_group(i_core, tree, 'i', threshold)
-    add_group(o_core, tree, 'o', threshold)
-
-    print 'exporting tree'
+    add_group(i_core, tree, 'i', args.threshold)
+    add_group(o_core, tree, 'o', args.threshold)
     c_signif = '#00441b'
     c_insignif = '#f7fcfd'
-    export_tree(tree, sys.argv[3], c_signif, c_insignif, 'i')
+    export_tree(tree, args.output, c_signif, c_insignif, 'i')
