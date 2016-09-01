@@ -1,13 +1,10 @@
 from ete3 import Tree, TreeStyle, faces, TextFace, RectFace
-import re
 from colour import Color
 import sys
 import csv
-import os
 
 # Feature name to mark nodes in the core OTUs
-IN_CORE_FEATURE = 'in_core'
-IN_OUT_FEATURE = 'in_out'
+GROUP_FEATURE = 'group'
 TAXA_FEATURE = 'taxa'
 OTU_FEATURE = 'otu'
 P_VAL_FEATURE = 'p_val'
@@ -15,10 +12,10 @@ CORRECTED_P_VAL_FEATURE = 'corrected_p_val'
 THRESHOLD_FEATURE = 'threshold'
 
 # The maximum corrected pvalue a significant otu might have
-MAX_PVAL = 0.05
+MAX_PVAL = 0.05                 # TODO: make this user changeable
 
 
-def generate_layout(signif_color, insignif_color):
+def generate_layout(signif_color, insignif_color, interest_group):
     '''
     Generates a layout function given a color for more insignigant otus
     and a color for more significant otus; a linear interpolation between
@@ -32,11 +29,7 @@ def generate_layout(signif_color, insignif_color):
         # Label the leaves
         if node.is_leaf():
             color = 'Black'
-            if hasattr(node, IN_CORE_FEATURE):
-                if hasattr(node, IN_OUT_FEATURE):
-                    # This node is in the core for both the in and out group
-                    # In theory this should not be happening
-                    color = 'Red'
+            if getattr(node, GROUP_FEATURE) == interest_group:
                 pval = float(getattr(node, CORRECTED_P_VAL_FEATURE))
                 pval_color = interpolate_color(signif_color, insignif_color,
                                                pval/MAX_PVAL)
@@ -71,28 +64,15 @@ def interpolate_color(low_color, high_color, value):
     return out.get_hex()
 
 
-def export_tree(tree, filename, insignif_color, signif_color):
+def export_tree(tree, filename, insignif_color, signif_color, i_group):
     '''
     exports the given tree to the given filename
     '''
     ts = TreeStyle()
     ts.show_leaf_name = False
     ts.show_scale = False
-    ts.layout_fn = generate_layout(insignif_color, signif_color)
+    ts.layout_fn = generate_layout(insignif_color, signif_color, i_group)
     tree.render(filename, h=1080, tree_style=ts)
-
-
-def annotate_group(group, tree, taxa_code_mapping, group_feature, threshold):
-    '''
-    Annotates the given group of otus in the given tree.
-    Returns a list of the nodes annotated
-    '''
-    annotated = []
-    for otu in group:
-        if otu['threshold'] >= threshold:
-            annotated.append(annotate_otu(otu, tree, taxa_code_mapping,
-                                          group_feature))
-    return annotated
 
 
 def annotate_otu(otu, tree, taxa_code_mapping, group_feature):
@@ -130,40 +110,6 @@ def get_taxa(name):
     return tuple(taxa)
 
 
-def load_gg_tree(filename):
-    '''
-    Loads an annotated tree from the GreenGenes database. These trees use a
-    format that is a bit different from what ete3 wants.
-    '''
-    f = open(filename, 'r')
-    data = f.read()
-    f.close()
-    # change things like (5:1.2) to ('5':1.2),
-    # so that the data can work with
-    data = re.sub('([(),])(\\d+\\.?\d*):(\\d+\\.?\\d*)', "\\1\'\\2\':\\3",
-                  data)
-    # replace : characters inside quotes with |
-    data = re.sub("([(),]'[^(),]+?):([^().]+?')", '\\1|\\2', data)
-    # replace ; characters not at the end with !
-    data = re.sub(';(.)', '!\\1', data)
-    return Tree(data, format=1)
-
-
-def build_taxonomy_code_map(filename):
-    '''
-    build a dictonary maping taxonomies (stored as tuples) with their numeric
-    codes (stored as strings with quotes)
-    '''
-    tax_code_map = dict()
-    f = open(filename, 'r')
-    for line in f:
-        code, taxonomy_string = line.strip().split('\t')
-        taxonomy = get_taxa(taxonomy_string)
-        tax_code_map[code] = taxonomy
-        tax_code_map[taxonomy] = "'" + code + "'"
-    return tax_code_map
-
-
 def parse_output(filename):
     core = []
     with open(filename) as tsv:
@@ -180,6 +126,46 @@ def parse_output(filename):
     return core
 
 
+def add_group(otus, tree, group, threshold):
+    '''
+    Makes a tree from the given OTUs
+    '''
+    for otu in otus:
+        if otu['threshold'] >= threshold:
+            add_otu(otu, tree, group)
+    return tree
+
+
+def find_immediate_child(node, name):
+    '''
+    looks for an immediate child of the given node with the given name. If
+    none exists returns None, otherwise returns the first such child.
+    '''
+    for child in node.children:
+        if child.name == name:
+            return child
+    return None
+
+
+def add_otu(otu, tree, group):
+    ptr = tree
+    otu_taxa = get_taxa(otu['otu'])
+    for taxon in otu_taxa:
+        child = find_immediate_child(ptr, taxon)
+        if not child:
+            ptr = ptr.add_child(name=taxon)
+        else:
+            ptr = child
+    ptr.add_features(**{
+        GROUP_FEATURE: group,
+        TAXA_FEATURE: otu_taxa,
+        OTU_FEATURE: otu['otu'],
+        P_VAL_FEATURE: otu['pval'],
+        CORRECTED_P_VAL_FEATURE: otu['corrected_pval'],
+        THRESHOLD_FEATURE: otu['threshold'],
+    })
+
+
 if __name__ == '__main__':
     if len(sys.argv) not in [4, 5]:
         print("""Usage
@@ -190,28 +176,19 @@ visualize_core.py <interest_core.tsv> <out_core.tsv> <output.png> [threshold]
 <output.png> --- The image file to output to
 [threshold] --- (optional) The minimum threshold to include. 0 by default
 """)
-    os.chdir(os.path.dirname(sys.argv[0]))
-    core = parse_output(sys.argv[1])
-    out = parse_output(sys.argv[2])
+    i_core = parse_output(sys.argv[1])
+    o_core = parse_output(sys.argv[2])
     if len(sys.argv) == 5:
         threshold = int(sys.argv[4])
     else:
         threshold = 0
 
-    print 'importing'
-    tree = load_gg_tree('tree_files/97_otus.tree')
-    print 'building map'
-    mapping = build_taxonomy_code_map('tree_files/97_otu_taxonomy.txt')
-    print 'finding and marking core and out groups'
-    core_nodes = annotate_group(core, tree, mapping, IN_CORE_FEATURE,
-                                threshold)
-    out_nodes = annotate_group(out, tree, mapping, IN_OUT_FEATURE,
-                               threshold)
+    print 'building tree'
+    tree = Tree()
+    add_group(i_core, tree, 'i', threshold)
+    add_group(o_core, tree, 'o', threshold)
 
-    print 'pruning...'
-    tree.prune(core_nodes + out_nodes)
-
-    # tree = Tree('pruned.nh')
+    print 'exporting tree'
     c_signif = '#00441b'
     c_insignif = '#f7fcfd'
-    export_tree(tree, sys.argv[3], c_signif, c_insignif)
+    export_tree(tree, sys.argv[3], c_signif, c_insignif, 'i')
