@@ -12,9 +12,6 @@ P_VAL_FEATURE = 'p_val'
 CORRECTED_P_VAL_FEATURE = 'corrected_p_val'
 THRESHOLD_FEATURE = 'threshold'
 
-# The maximum corrected pvalue a significant otu might have
-MAX_PVAL = 0.05                 # TODO: make this user changeable
-
 
 def generate_layout(signif_color, insignif_color, interest_group):
     '''
@@ -29,44 +26,35 @@ def generate_layout(signif_color, insignif_color, interest_group):
         '''
         # Label the leaves
         if node.is_leaf():
-            color = 'Black'
-            # If the node is in the interest group
-            if getattr(node, GROUP_FEATURE) == interest_group:
-                pval = float(getattr(node, CORRECTED_P_VAL_FEATURE))
-                pval_color = interpolate_color(signif_color, insignif_color,
-                                               pval/MAX_PVAL)
-                faces.add_face_to_node(RectFace(10, 10, fgcolor='Black',
-                                                bgcolor=pval_color),
-                                       node, column=1, aligned=True)
-                faces.add_face_to_node(
-                    TextFace('  {0:0.5f}  {1}'.format(
-                        float(getattr(node, CORRECTED_P_VAL_FEATURE)),
-                        getattr(node, OTU_FEATURE))),
-                    node, column=2, aligned=True)
-            else:  # node is in the out group
-                color = 'Blue'
-            faces.add_face_to_node(TextFace(getattr(node, TAXA_FEATURE)[-1],
-                                            fgcolor=color),
+            faces.add_face_to_node(TextFace(
+                getattr(node, TAXA_FEATURE)[-1],
+                fgcolor=('blue'
+                         if getattr(node, GROUP_FEATURE) == interest_group
+                         else 'black')),
                                    node, column=0)
+            pval = float(getattr(node, CORRECTED_P_VAL_FEATURE))
+            pval_color = get_color(pval)
+            faces.add_face_to_node(RectFace(10, 10, fgcolor='Black',
+                                            bgcolor=pval_color),
+                                   node, column=1, aligned=True)
+            faces.add_face_to_node(
+                TextFace('  {0:0.5f}  {1}'.format(
+                    float(getattr(node, CORRECTED_P_VAL_FEATURE)),
+                    getattr(node, OTU_FEATURE))),
+                node, column=2, aligned=True)
     return layout
 
 
-def interpolate_color(low_color, high_color, value):
-    '''
-    returns a color (hex code) for a color placed between low_color and
-    high_color (both given as strings in a format that works with the colour
-    library) scaled with value, which should be between zero and one; if
-    value is zero, low_color will be returned, if value is one high_color
-    will be returned. The scaling used is linear in HSL space.
-    '''
-    low = Color(low_color).hsl
-    high = Color(high_color).hsl
-    out = map((lambda h, l: (h - l) * value + l), high, low)
-    out = Color(hue=out[0], saturation=out[1], luminance=out[2])
-    return out.get_hex()
+def get_color(value):
+    if value < 0.001:
+        return '#2ca25f'
+    elif value < 0.01:
+        return '#99d8c9'
+    else:
+        return '#e5f5f9'
 
 
-def export_tree(tree, filename, insignif_color, signif_color, i_group):
+def export_tree(tree, filename, insignif_color, signif_color, i_group, width):
     '''
     exports the given tree to the given filename
     '''
@@ -74,7 +62,7 @@ def export_tree(tree, filename, insignif_color, signif_color, i_group):
     ts.show_leaf_name = False
     ts.show_scale = False
     ts.layout_fn = generate_layout(insignif_color, signif_color, i_group)
-    tree.render(filename, h=1080, tree_style=ts)
+    tree.render(filename, w=width, tree_style=ts)
 
 
 def annotate_otu(otu, tree, taxa_code_mapping, group_feature):
@@ -128,14 +116,17 @@ def parse_output(filename):
     return core
 
 
-def add_group(otus, tree, group, threshold):
+def add_group(otus, tree, group, min_threshold, max_threshold):
     '''
     Makes a tree from the given OTUs
     '''
+    added_otus = 0
     for otu in otus:
-        if otu['threshold'] >= threshold:
+        if otu['threshold'] >= min_threshold and\
+           otu['threshold'] <= max_threshold:
             add_otu(otu, tree, group)
-    return tree
+            added_otus += 1
+    return added_otus
 
 
 def find_immediate_child(node, name):
@@ -168,6 +159,13 @@ def add_otu(otu, tree, group):
     })
 
 
+def trim_top(tree):
+    ptr = tree
+    while len(ptr.children) == 1:
+        ptr = ptr.children[0]
+    return ptr
+
+
 def setup_parser():
     parser = argparse.ArgumentParser(
         description='Generate a tree visualization of the output from coremic')
@@ -181,12 +179,14 @@ def setup_parser():
         'output',
         help='The image file to output the result to')
     parser.add_argument(
-        '-t', '--threshold', type=float, default=0,
+        '-n', '--min_threshold', type=float, default=0,
         help='The minimum threshold to include in the tree. Defaults to zero.')
     parser.add_argument(
-        '-p', '--max_p', type=float, default=0.05,
-        help=('The maximum adjusted p-value used in the analysis. ' +
-              'This is used to scale the coloring of the p-value indicators.'))
+        '-x', '--max_threshold', type=float, default=100,
+        help='The maximum threshold to include in the tree. Defaults to 100.')
+    parser.add_argument(
+        '-r', '--horizontal_resolution', type=int, default=1080,
+        help='The horizontal resolution of the output image')
     return parser
 
 
@@ -196,8 +196,14 @@ if __name__ == '__main__':
     i_core = parse_output(args.interest_core)
     o_core = parse_output(args.out_core)
     tree = Tree()
-    add_group(i_core, tree, 'i', args.threshold)
-    add_group(o_core, tree, 'o', args.threshold)
+    if not add_group(i_core, tree, 'i', args.min_threshold,
+                     args.max_threshold)\
+       and not add_group(o_core, tree, 'o', args.min_threshold,
+                         args.max_threshold):
+        print('No OTUs in specified threshold range!')
+        sys.exit(1)
+    tree = trim_top(tree)
     c_signif = '#00441b'
     c_insignif = '#f7fcfd'
-    export_tree(tree, args.output, c_signif, c_insignif, 'i')
+    export_tree(tree, args.output, c_signif, c_insignif, 'i',
+                args.horizontal_resolution)
