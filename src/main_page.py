@@ -20,7 +20,7 @@ class MainPage(webapp2.RequestHandler):
         group = map(lambda s: s.strip(), self.request.get('group').split(','))
         group_name = self.request.get('group_name')
         out_group_name = self.request.get('out_group_name')
-        timestamp = strftime("%a-%d-%b-%Y-%I:%M:%S-%p", localtime())
+        timestamp = strftime('%a-%d-%b-%Y-%I:%M:%S-%p', localtime())
 
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))

@@ -1,12 +1,13 @@
 from google.appengine.api import mail
 from google.appengine.api.app_identity import get_application_id
+from time import strptime, mktime
+from datetime import datetime
 
 import logging
 
 
 def send_results_as_email(params, attachments):
-    subj = "Your data from %s with name %s has been processed" % (
-        params['timestamp'], params['run_name'])
+    subj = "Your data with name %s has been processed" % params['run_name']
     msg_str = """
 Dear User:
 
@@ -18,6 +19,12 @@ The Core Microbiome Team
 
 """
     msg_str += params['user_args']
+    elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
+        strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
+    logging.info('Elapsed time: %d.%6d seconds' % (elapsed_time.seconds,
+                                                   elapsed_time.microseconds))
+    msg_str += 'Elapsed time: %d.%6d seconds\n' % (elapsed_time.seconds,
+                                                   elapsed_time.microseconds)
     message = make_base_email(subj, params['to_email'], msg_str)
     message.body = msg_str
     message.attachments = attachments
@@ -27,8 +34,8 @@ The Core Microbiome Team
 
 def send_error_as_email(params, error):
     logging.warn(error)
-    subj = 'There was an error in processing your data from %s with name %s'\
-           % (params['timestamp'], params['run_name'])
+    subj = 'There was an error in processing your data with name %s'\
+           % params['run_name']
     msg_str = """
 Dear User:
 
@@ -40,6 +47,12 @@ The Core Microbiome Team
 
 """
     msg_str += params['user_args']
+    elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
+        strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
+    logging.info('Elapsed time: %d.%6d seconds' % (elapsed_time.seconds,
+                                                   elapsed_time.microseconds))
+    msg_str += 'Elapsed time: %d.%6d seconds\n' % (elapsed_time.seconds,
+                                                   elapsed_time.microseconds)
     msg_str += '\n' + error
     message = make_base_email(subj, params['to_email'], msg_str)
     message.send()
