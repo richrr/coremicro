@@ -176,16 +176,18 @@ def setup_parser():
         'out_core',
         help='The tsv file containing the core of the out group')
     parser.add_argument(
-        'output',
-        help='The image file to output the result to')
+        'output', nargs='+',
+        help=('The image file(s) to output the result to. Multiple files ' +
+              'may specified to allow output in multiple image formats. The ' +
+              'image format will be automatically detected from the filename'))
     parser.add_argument(
-        '-n', '--min_threshold', type=float, default=0,
+        '-n', '--min_threshold', type=float, default=0, metavar='min',
         help='The minimum threshold to include in the tree. Defaults to zero.')
     parser.add_argument(
-        '-x', '--max_threshold', type=float, default=100,
+        '-x', '--max_threshold', type=float, default=100, metavar='max',
         help='The maximum threshold to include in the tree. Defaults to 100.')
     parser.add_argument(
-        '-r', '--horizontal_resolution', type=int, default=1080,
+        '-r', '--horizontal_resolution', type=int, default=5000, metavar='res',
         help='The horizontal resolution of the output image')
     return parser
 
@@ -196,14 +198,15 @@ if __name__ == '__main__':
     i_core = parse_output(args.interest_core)
     o_core = parse_output(args.out_core)
     tree = Tree()
-    if not add_group(i_core, tree, 'i', args.min_threshold,
-                     args.max_threshold)\
-       and not add_group(o_core, tree, 'o', args.min_threshold,
-                         args.max_threshold):
+    if not any([add_group(i_core, tree, 'i', args.min_threshold,
+                          args.max_threshold),
+                add_group(o_core, tree, 'o', args.min_threshold,
+                          args.max_threshold)]):
         print('No OTUs in specified threshold range!')
         sys.exit(1)
     tree = trim_top(tree)
     c_signif = '#00441b'
     c_insignif = '#f7fcfd'
-    export_tree(tree, args.output, c_signif, c_insignif, 'i',
-                args.horizontal_resolution)
+    for outfile in args.output:
+        export_tree(tree, outfile, c_signif, c_insignif, 'i',
+                    args.horizontal_resolution)
