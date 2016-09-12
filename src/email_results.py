@@ -21,10 +21,10 @@ The Core Microbiome Team
     msg_str += params['user_args']
     elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
         strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-    logging.info('Elapsed time: %d.%6d seconds' % (elapsed_time.seconds,
-                                                   elapsed_time.microseconds))
-    msg_str += 'Elapsed time: %d.%6d seconds\n' % (elapsed_time.seconds,
-                                                   elapsed_time.microseconds)
+    logging.info('Elapsed time: %d.%06d seconds' % (elapsed_time.seconds,
+                                                    elapsed_time.microseconds))
+    msg_str += 'Elapsed time: %d.%06d seconds\n' % (elapsed_time.seconds,
+                                                    elapsed_time.microseconds)
     message = make_base_email(subj, params['to_email'], msg_str)
     message.body = msg_str
     message.attachments = attachments
@@ -49,10 +49,10 @@ The Core Microbiome Team
     msg_str += params['user_args']
     elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
         strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-    logging.info('Elapsed time: %d.%6d seconds' % (elapsed_time.seconds,
-                                                   elapsed_time.microseconds))
-    msg_str += 'Elapsed time: %d.%6d seconds\n' % (elapsed_time.seconds,
-                                                   elapsed_time.microseconds)
+    logging.info('Elapsed time: %d.%06d seconds' % (elapsed_time.seconds,
+                                                    elapsed_time.microseconds))
+    msg_str += 'Elapsed time: %d.%F6d seconds\n' % (elapsed_time.seconds,
+                                                    elapsed_time.microseconds)
     msg_str += '\n' + error
     message = make_base_email(subj, params['to_email'], msg_str)
     message.send()
