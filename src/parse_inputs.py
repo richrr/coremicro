@@ -16,9 +16,10 @@ def read_table(table_file):
     parsed_table = parse_biom_table(table_file)
     sample_ids = parsed_table.SampleIds
     otu_data = dict()
-
     for vals, id, md in parsed_table.iterObservations():
         otu = md['taxonomy']
+        if(isinstance(otu, type(list()))):
+            otu = ';'.join(otu)
         if otu_data.get(otu) is not None:
             otu_data[otu] = vals + otu_data[otu]  # both are numpy arrays
         else:
