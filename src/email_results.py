@@ -2,8 +2,9 @@ from google.appengine.api import mail
 from google.appengine.api.app_identity import get_application_id
 from time import strptime, mktime
 from datetime import datetime
-
 import logging
+
+import run_config
 
 
 def send_results_as_email(params, attachments):
@@ -59,6 +60,8 @@ The Core Microbiome Team
 
 
 def make_base_email(subj, to_email, msg):
+    if not run_config.IS_PRODUCTION:
+        logging.info(msg)
     app_id = get_application_id()
     return mail.EmailMessage(
         sender="Core Microbiome <do-not-reply@%s.appspotmail.com>" % app_id,

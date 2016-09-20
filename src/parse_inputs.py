@@ -15,6 +15,7 @@ def read_table(table_file):
     """
     parsed_table = parse_biom_table(table_file)
     sample_ids = parsed_table.SampleIds
+    original_otus = len(parsed_table.ObservationIds)
     otu_data = dict()
     for vals, id, md in parsed_table.iterObservations():
         otu = md['taxonomy']
@@ -28,26 +29,27 @@ def read_table(table_file):
     observation_ids = otu_data.keys()
     data = [otu_data[o] for o in observation_ids]
     return table_factory(data, sample_ids, observation_ids,
-                         constructor=SparseOTUTable)
+                         constructor=SparseOTUTable), original_otus
 
 
 def get_data_summary(table, mapping_dict, i_group, min_abundance):
     """Gives a summary of the data for each otu to use in processing
     """
-    i_samples = samples(mapping_dict, i_group)
-    n_interest = len(i_samples)
+    # column number of interest samples
+    i_indexes = [i for i, id in enumerate(table.SampleIds)
+                 if id in samples(mapping_dict, i_group)]
+    n_interest = len(i_indexes)
     total = sum([len(mapping_dict[group]) for group in mapping_dict])
-    i_vals = {
-        otu: vals for vals, otu, md in table.filterSamples(
-            lambda values, id, md: id in i_samples
-        ).iterObservations()
-    }
-    vals = {otu: vals for vals, otu, md in table.iterObservations()}
-    return {otu: OTU_Data(n_interest,
-                          num_present(i_vals[otu], min_abundance),
-                          total,
-                          num_present(vals[otu], min_abundance))
-            for otu in i_vals.keys()}
+    data_summary = dict()
+    for vals, otu, md in table.iterObservations():
+        data_summary[otu] = OTU_Data(
+            n_interest,
+            num_present([v for i, v in enumerate(vals) if i in i_indexes],
+                        min_abundance),
+            total,
+            num_present(vals, min_abundance)
+        )
+    return data_summary
 
 
 def samples(mapping_dict, group):
@@ -80,9 +82,9 @@ def get_categ_samples_dict(mapping_info_list, factor):
     return local_dict
 
 
-def validate_inputs(params, inputs):
-    """Validate that the given inputs are usable"""
-    mapping_file = inputs['mapping_file']
+def parse_inputs(params, mapping_file, data):
+    """Validate that the given inputs are usable and parse them into usable
+    formats"""
     factor = params['factor']
     group = params['group']
 
@@ -110,7 +112,13 @@ def validate_inputs(params, inputs):
         pass                    # already handled previously
 
     try:
-        read_table(inputs['data'])
+        filtered_data, original_otus = read_table(data)
+        params['user_args'] += (
+            'OTUs before combining duplicates: %s\n' +
+            'OTUs after combining duplicates: %s\n\n\n') % (
+                original_otus,
+                len(filtered_data.ObservationIds)
+            )
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)
 
@@ -119,4 +127,4 @@ def validate_inputs(params, inputs):
     elif params['max_p'] > 1:
         errors_list.append('Maximum p-value can not be greater than one')
 
-    return (errors_list, mapping_dict, out_group)
+    return (errors_list, mapping_dict, out_group, filtered_data)

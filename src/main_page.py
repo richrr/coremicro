@@ -1,9 +1,10 @@
 import webapp2
 from time import localtime, strftime
+import cPickle
 
 import run_config
 from process_data import RunPipeline
-from parse_inputs import validate_inputs
+from parse_inputs import parse_inputs
 
 
 class MainPage(webapp2.RequestHandler):
@@ -12,6 +13,9 @@ class MainPage(webapp2.RequestHandler):
         self.response.write(template.render())
 
     def post(self):
+        # Used to measure total processing time
+        timestamp = strftime('%a-%d-%b-%Y-%I:%M:%S-%p', localtime())
+
         run_name = self.request.get('name')
         data = self.request.get('datafile')
         mapping_file = self.request.get('groupfile').split('\n')
@@ -20,7 +24,6 @@ class MainPage(webapp2.RequestHandler):
         group = map(lambda s: s.strip(), self.request.get('group').split(','))
         group_name = self.request.get('group_name')
         out_group_name = self.request.get('out_group_name')
-        timestamp = strftime('%a-%d-%b-%Y-%I:%M:%S-%p', localtime())
 
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
@@ -32,7 +35,7 @@ class MainPage(webapp2.RequestHandler):
         user_args = (('You selected the following parameters:' +
                       '\nFactor: %s\nGroup: %s\n' +
                       'Pval correction: %s\n\n\n')
-                     % (factor, group, p_val_adj))
+                     % (factor, ', '.join(group), p_val_adj))
 
         params = {
             'run_name': run_name,
@@ -46,15 +49,15 @@ class MainPage(webapp2.RequestHandler):
             'min_abundance': min_abundance,
         }
 
-        inputs = {
-            'mapping_file': mapping_file,
-            'data': data,
-        }
-
-        errors_list, mapping_dict, out_group = validate_inputs(params, inputs)
-
+        errors_list, mapping_dict, out_group, filtered_data \
+            = parse_inputs(params, mapping_file, data)
+        
         params['out_group'] = out_group
-        inputs['mapping_dict'] = mapping_dict
+        inputs = {
+            'mapping_dict': mapping_dict,
+            # Must be packed up to be able to pass to the process_data task
+            'filtered_data': cPickle.dumps(filtered_data),
+        }
 
         params['run_cfgs'] = [
             {

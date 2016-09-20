@@ -1,9 +1,10 @@
 import logging
 import pipeline
+import cPickle
 
 import run_config
 from email_results import send_error_as_email, send_results_as_email
-from parse_inputs import read_table, get_data_summary
+from parse_inputs import get_data_summary
 from probability import row_randomize_probability
 from generate_graph import generate_graph
 from correct_p_values import correct_pvalues
@@ -12,9 +13,8 @@ from correct_p_values import correct_pvalues
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
-        # Must be processed here because the otu_table class can't be given to
-        # a pipeline as an argument
-        inputs['filtered_data'] = read_table(inputs['data'])
+        # Unpack the data
+        inputs['filtered_data'] = cPickle.loads(str(inputs['filtered_data']))
 
         attachments = list()
         for cfg in params['run_cfgs']:
