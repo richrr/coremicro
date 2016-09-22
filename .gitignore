@@ -3,3 +3,5 @@ lib/*
 *.pyc
 
 *.DS_Store
+
+src/email_config.py
