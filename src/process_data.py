@@ -18,7 +18,6 @@ class RunPipeline(pipeline.Pipeline):
 
         attachments = list()
         for cfg in params['run_cfgs']:
-            
             results = get_signif_otus(inputs, cfg)
             attachments += format_results(results, params, cfg)
             attachments += generate_graph(params, inputs, cfg, results)
@@ -79,5 +78,8 @@ def format_results(res, params, cfg):
     if not run_config.IS_PRODUCTION:
         print "Results for configuration: " + cfg['name']
         print sign_results
-    return [('%s_results_%s.tsv' % (cfg['name'], params['run_name']),
-            sign_results)]
+    return [{
+        'Content-Type': 'text/plain',
+        'Filename': '%s_results_%s.tsv' % (cfg['name'], params['run_name']),
+        'content': sign_results
+    }]

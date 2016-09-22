@@ -33,12 +33,15 @@ def generate_graph(params, inputs, cfg, results):
         )))
 
         if run_config.IS_PRODUCTION:
-            attachments.append((
-                '%s_plot_%s_%s.svg' % (cfg['name'], int(frac * 100),
-                                       params['run_name']),
-                make_graph(stats, cfg['group_name'], cfg['out_group_name'],
-                           frac)
-            ))
+            attachments.append({
+                'Content-Type': 'image/svg+xml',
+                'Filename': '%s_plot_%s_%s.svg' % (cfg['name'],
+                                                   int(frac * 100),
+                                                   params['run_name']),
+                'content': make_graph(stats, cfg['group_name'],
+                                      cfg['out_group_name'],
+                                      frac)
+            })
 
         ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
         for i in range(len(otus)):
@@ -50,9 +53,13 @@ def generate_graph(params, inputs, cfg, results):
                 o_samples,
                 stats[i].otu)
 
-        attachments.append(('%s_plot_labels_%s_%s.tsv' %
-                            (cfg['name'], int(frac * 100), params['run_name']),
-                            ref_text))
+        attachments.append({
+            'Content-Type': 'text/tab-separated-values',
+            'Filename': '%s_plot_labels_%s_%s.tsv' % (cfg['name'],
+                                                      int(frac * 100),
+                                                      params['run_name']),
+            'content': ref_text
+        })
     if not run_config.IS_PRODUCTION:
         logging.warn('Graphs not generated because in development mode')
     return attachments

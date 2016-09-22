@@ -1,2 +1,5 @@
 GoogleAppEnginePipeline==1.9.22.1
 pyqi==0.3.1
+requests==2.10.0
+requests-toolbelt==0.6.2
+mailjet-rest==v1.2.2
