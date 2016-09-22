@@ -193,6 +193,8 @@ def setup_parser():
 
 
 if __name__ == '__main__':
+    print('This tool is free to use for non-profit or research purposes. ' +
+          'Please cite <...>\n')
     parser = setup_parser()
     args = parser.parse_args()
     i_core = parse_output(args.interest_core)
