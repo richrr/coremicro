@@ -34,8 +34,8 @@ class MainPage(webapp2.RequestHandler):
 
         user_args = (('You selected the following parameters:' +
                       '\nFactor: %s\nGroup: %s\n' +
-                      'Pval correction: %s\n\n\n')
-                     % (factor, ', '.join(group), p_val_adj))
+                      'Pval correction: %s\nMax Pval: %s\n\n\n')
+                     % (factor, ', '.join(group), p_val_adj, max_p))
 
         params = {
             'run_name': run_name,
@@ -51,7 +51,7 @@ class MainPage(webapp2.RequestHandler):
 
         errors_list, mapping_dict, out_group, filtered_data \
             = parse_inputs(params, mapping_file, data)
-        
+
         params['out_group'] = out_group
         inputs = {
             'mapping_dict': mapping_dict,

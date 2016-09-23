@@ -1,9 +1,11 @@
 import logging
 import pipeline
 import cPickle
+from datetime import datetime
+from time import strptime, mktime
 
 import run_config
-from email_results import send_error_as_email, send_results_as_email
+from send_email import send_email
 from parse_inputs import get_data_summary
 from probability import row_randomize_probability
 from generate_graph import generate_graph
@@ -21,7 +23,23 @@ class RunPipeline(pipeline.Pipeline):
             results = get_signif_otus(inputs, cfg)
             attachments += format_results(results, params, cfg)
             attachments += generate_graph(params, inputs, cfg, results)
-        send_results_as_email(params, attachments)
+        elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
+            strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
+        send_email(('Your data with name %s has been processed' %
+                    params['run_name']),
+                   '''Dear User:
+
+Your data has been processed and is attached. Thanks for using this tool.
+
+Please email us if you have any questions.
+
+The Core Microbiome Team
+
+%s
+Elapsed time: %d.%06d seconds''' % (params['user_args'],
+                                    elapsed_time.seconds,
+                                    elapsed_time.microseconds),
+                   params['to_email'], attachments)
 
     def finalized(self):
         logging.info('Finalizing task')
@@ -30,7 +48,25 @@ class RunPipeline(pipeline.Pipeline):
         if self.was_aborted:    # There's probably a bug in the code
             error = 'An unknown error has occured. Please try again. ' +\
                     'If this occurs again please contact the developers'
-            send_error_as_email(params, error)
+            logging.warn(error)
+            elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
+                strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
+            send_email('There was an error in processing your data with ' +
+                       'name %s' % params['run_name'],
+                       '''Dear User:
+
+There was an error in processing your data. The error is listed below.
+
+Please email us if you have any questions.
+
+The Core Microbiome Team
+
+%s
+Elapsed time %d.%06d seconds
+
+%s''' % (params['user_args'], elapsed_time.seconds, elapsed_time.microseconds,
+         error),
+                       params['to_email'])
         self.cleanup()
 
 
