@@ -14,6 +14,7 @@ cite: &lt;&hellip;&gt;
   <li><a href="#outputs">Output Files</a></li>
   <li><a href="#method">Method details</a></li>
   <li><a href="#sample_data">Sample Data</a></li>
+  <li><a href="#post_processing">Post Processing</a></li>
   <li><a href="#faq">FAQs</a></li>
 </ol>
 <h2 id="input_files">Input files</h2>
@@ -188,10 +189,22 @@ microbiome OTUs. <br>
 Future versions of this tool will include more complicated algorithms.
 
 <h2 id="sample_data">Sample Data</h2>
-A sample datafile can be downloaded
+<p>A sample datafile can be downloaded
 <a href="sample_data/otu_table_16s.biom">here</a> and a sample
 groupfile can be downloaded
-<a href="sample_data/sample-sheet-qiime.txt">here</a>.
+<a href="sample_data/sample-sheet-qiime.txt">here</a>.</p>
+
+<h2 id="post_processing">Post Processing</h2>
+<p>The results are given in TSV form to allow them to be easialy imported into
+  any other processing you may wish to do. This format can be imported into
+  Excel and is easy to parse from code.</p>
+<p>Additionally, we have created a script to visualize the core OTUs
+  taxonomically by generating a tree of them. This tree shows the core of both
+  the interest and the out group with the <i>p</i>-value and OTU name for each
+  OTU. The script can be downloaded
+  <a href="scripts/visualize_core.py">here</a>. It requires that
+  <a href="http://etetoolkit.org/download/">ete3</a> be installed. Run
+  "visualize_core.py -h" for help.</p>
 
 <h2 id="faq">FAQs</h2>
 <h3>How long does it take to run?</h3>
