@@ -1,7 +1,20 @@
+# Copyright 2016 Richard Rodrigues, Nyle Rodgers, Mark Williams, Virginia Tech
+#
+# This file is part of Coremic.
+#
+# Coremic is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Coremic is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 from parse_inputs import get_categ_samples_dict, read_table
-from probability import (row_randomize_probability,
-                         column_randomize_probability,
-                         full_table_randomize_probability)
 from operator import mul
 import itertools
 import math
@@ -42,20 +55,20 @@ n_interest = len(mapping[group])
 #                                 n_interest,
 #                                 frac)
 
-print 'Column Wise'
-interest_columns = [vals for vals, id, md in data.iterSamples()
-                    if id in mapping[group]]
-probs = [float(sum([v > 0 for v in c]))/len(c)
-         for c in interest_columns]
-print sum([
-        sum([
-            product([
-                probs[i] if i in comb else 1-probs[i]
-                for i in range(n_interest)])
-            for comb in itertools.combinations(range(n_interest), r)])
-        for r in range(int(math.ceil(frac * n_interest)), n_interest + 1)])
-print product(probs)
-print column_randomize_probability(interest_columns, frac)
+# print 'Column Wise'
+# interest_columns = [vals for vals, id, md in data.iterSamples()
+#                     if id in mapping[group]]
+# probs = [float(sum([v > 0 for v in c]))/len(c)
+#          for c in interest_columns]
+# print sum([
+#         sum([
+#             product([
+#                 probs[i] if i in comb else 1-probs[i]
+#                 for i in range(n_interest)])
+#             for comb in itertools.combinations(range(n_interest), r)])
+#         for r in range(int(math.ceil(frac * n_interest)), n_interest + 1)])
+# print product(probs)
+# print column_randomize_probability(interest_columns, frac)
 
 # print 'Full Table'
 # table_vals = [vals for vals, id, md in data.iterObservations()]
