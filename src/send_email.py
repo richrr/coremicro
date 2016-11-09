@@ -43,3 +43,7 @@ def send_email(subj, msg, to_email, attachments=[]):
     if result.status_code != 200:
         logging.error('Unable to sucesfully email results\n' +
                       'Status code of %s' % result.status_code)
+        logging.error(result.error_info)
+        logging.error(result.error_message)
+    else:
+        logging.info('Email sent to %s with subject %s', to_email, subj)

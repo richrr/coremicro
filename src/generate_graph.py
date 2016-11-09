@@ -20,6 +20,7 @@ import StringIO
 import numpy
 import logging
 from collections import namedtuple
+import base64
 
 from parse_inputs import samples
 import run_config
@@ -56,9 +57,10 @@ def generate_graph(params, inputs, cfg, results):
                 'Filename': '%s_plot_%s_%s.svg' % (cfg['name'],
                                                    int(frac * 100),
                                                    params['run_name']),
-                'content': make_graph(stats, cfg['group_name'],
-                                      cfg['out_group_name'],
-                                      frac)
+                'content': base64.b64encode(make_graph(stats,
+                                                       cfg['group_name'],
+                                                       cfg['out_group_name'],
+                                                       frac))
             })
 
         ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
@@ -76,7 +78,7 @@ def generate_graph(params, inputs, cfg, results):
             'Filename': '%s_plot_labels_%s_%s.tsv' % (cfg['name'],
                                                       int(frac * 100),
                                                       params['run_name']),
-            'content': ref_text
+            'content': base64.b64encode(ref_text)
         })
     if not run_config.IS_PRODUCTION:
         logging.warn('Graphs not generated because in development mode')

@@ -17,6 +17,7 @@
 import logging
 import pipeline
 import cPickle
+import base64
 from datetime import datetime
 from time import strptime, mktime
 
@@ -133,5 +134,5 @@ def format_results(res, params, cfg):
     return [{
         'Content-Type': 'text/plain',
         'Filename': '%s_results_%s.tsv' % (cfg['name'], params['run_name']),
-        'content': sign_results
+        'content': base64.b64encode(sign_results)
     }]
