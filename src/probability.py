@@ -17,9 +17,10 @@
 
 
 def row_randomize_probability(data):
-    """The probability that if n_interest valsues are chosen from vals the number
-    present in the interest group will be as many or greater than what was
-    originally found. This is calculated with a one-tailed Fisher's Exact Test
+    """The probability that if n_interest valsues are chosen from vals the
+    number present in the interest group will be as many or greater than what
+    was originally found. This is calculated with a one-tailed Fisher's Exact
+    Test
     """
     return (sum([nCr(data.present, need) *
                  nCr(data.total - data.present,

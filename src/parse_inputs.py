@@ -21,6 +21,7 @@ from biom.table import table_factory, SparseOTUTable
 from collections import namedtuple
 
 import run_config
+from probability import row_randomize_probability
 
 
 # Named Tuple to store information about the data in each row
@@ -50,7 +51,7 @@ def read_table(table_file):
                          constructor=SparseOTUTable), original_otus
 
 
-def get_data_summary(table, mapping_dict, i_group, min_abundance):
+def get_otu_data(table, mapping_dict, i_group, min_abundance):
     """Gives a summary of the data for each otu to use in processing
     """
     # column number of interest samples
@@ -58,16 +59,22 @@ def get_data_summary(table, mapping_dict, i_group, min_abundance):
                  if id in samples(mapping_dict, i_group)]
     n_interest = len(i_indexes)
     total = sum([len(mapping_dict[group]) for group in mapping_dict])
-    data_summary = dict()
+    otu_data = list()
     for vals, otu, md in table.iterObservations():
-        data_summary[otu] = OTU_Data(
+        data = OTU_Data(
             n_interest,
             num_present([v for i, v in enumerate(vals) if i in i_indexes],
                         min_abundance),
             total,
             num_present(vals, min_abundance)
         )
-    return data_summary
+        otu_data.append({
+            'otu': otu,
+            'data': data,
+            'presence': data.i_present / float(data.n_interest),
+            'pval': row_randomize_probability(data)
+        })
+    return otu_data
 
 
 def samples(mapping_dict, group):

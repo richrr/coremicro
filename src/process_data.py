@@ -23,8 +23,7 @@ from time import strptime, mktime
 
 import run_config
 from send_email import send_email
-from parse_inputs import get_data_summary
-from probability import row_randomize_probability
+from parse_inputs import get_otu_data
 from generate_graph import generate_graph
 from correct_p_values import correct_pvalues
 
@@ -88,27 +87,21 @@ Elapsed time %d.%06d seconds
 
 
 def get_signif_otus(inputs, cfg):
-    """Takes the set of OTUs at each fractional threshold that satisfy the
-    inclusion requirement that they be present at at least the threshold in the
-    interest group and at less than that threshold across all samples,
-    calculates the p-value for each OTU, and gives the list of OTUs found to be
-    significant after correction for multiple testing"""
-    data = get_data_summary(inputs['filtered_data'],
-                            inputs['mapping_dict'],
-                            cfg['group'],
-                            cfg['min_abundance'])
-    core = [otu for otu in data.keys()
-            if (data[otu].i_present /
-                float(data[otu].n_interest) >= cfg['min_frac'])]
-    pvals = [row_randomize_probability(data[otu])
-             for otu in core]
-    pvals_corrected = correct_pvalues(pvals, cfg['p_val_adj'])
-    return [{'otu': otu,
-             'pval': pvals[i],
-             'corrected_pval': pvals_corrected[i],
-             'presence': data[otu].i_present / float(data[otu].n_interest)}
-            for i, otu in enumerate(core)
-            if pvals_corrected[i] <= cfg['max_p']]
+    """Gives the set of OTUs that are considered to be significantly in the
+    core. The set of all OTUs are first filtered based on their p-value, after
+    correction for multiple sampling. Then they are filtered based on the
+    fraction of interest group samples they are present in"""
+    potential_otus = get_otu_data(inputs['filtered_data'],
+                                  inputs['mapping_dict'], cfg['group'],
+                                  cfg['min_abundance'])
+    corrected_pvalues = correct_pvalues(
+        [otu['pval'] for otu in potential_otus], cfg['p_val_adj']
+    )
+    for otu, corrected_pval in zip(potential_otus, corrected_pvalues):
+        otu['corrected_pval'] = corrected_pval
+    return [otu for otu in potential_otus
+            if (otu['corrected_pval'] <= cfg['max_p'] and
+                otu['presence'] >= cfg['min_frac'])]
 
 
 def format_results(res, params, cfg):
