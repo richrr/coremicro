@@ -100,12 +100,11 @@ def get_signif_otus(inputs, cfg):
     results = dict()
     core = {frac: [otu for otu in data.keys()
                    if (data[otu].i_present /
-                       float(data[otu].n_interest) >= frac) and
-                   data[otu].present / float(data[otu].total) < frac]
+                       float(data[otu].n_interest) >= frac)]
             for frac in run_config.FRACS}
     for frac in core:
         logging.info('Starting frac %f' % frac)
-        pvals = [row_randomize_probability(data[otu], frac)
+        pvals = [row_randomize_probability(data[otu])
                  for otu in core[frac]]
         pvals_corrected = correct_pvalues(pvals, cfg['p_val_adj'])
         results[frac] = [{'otu': otu,
