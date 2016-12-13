@@ -46,6 +46,7 @@ class MainPage(webapp2.RequestHandler):
         p_val_adj = self.request.get('pvaladjmethod')
         include_out = bool(self.request.get('include_out'))
         max_p = float(self.request.get('max_p'))
+        min_frac = float(self.request.get('min_frac'))
         min_abundance = float(self.request.get('min_abundance'))
 
         to_email = self.request.get('email')
@@ -64,6 +65,7 @@ class MainPage(webapp2.RequestHandler):
             'user_args': user_args,
             'include_out': include_out,
             'max_p': max_p,
+            'min_frac': min_frac,
             'min_abundance': min_abundance,
         }
 
@@ -87,6 +89,7 @@ class MainPage(webapp2.RequestHandler):
                 'min_abundance': min_abundance,
                 'name': group_name,
                 'max_p': max_p,
+                'min_frac': min_frac,
                 'p_val_adj': p_val_adj,
             }
         ]
@@ -101,6 +104,7 @@ class MainPage(webapp2.RequestHandler):
                 'min_abundance': min_abundance,
                 'name': out_group_name,
                 'max_p': max_p,
+                'min_frac': min_frac,
                 'p_val_adj': p_val_adj,
                 }
             )

@@ -97,36 +97,31 @@ def get_signif_otus(inputs, cfg):
                             inputs['mapping_dict'],
                             cfg['group'],
                             cfg['min_abundance'])
-    results = dict()
-    core = {frac: [otu for otu in data.keys()
-                   if (data[otu].i_present /
-                       float(data[otu].n_interest) >= frac)]
-            for frac in run_config.FRACS}
-    for frac in core:
-        logging.info('Starting frac %f' % frac)
-        pvals = [row_randomize_probability(data[otu])
-                 for otu in core[frac]]
-        pvals_corrected = correct_pvalues(pvals, cfg['p_val_adj'])
-        results[frac] = [{'otu': otu,
-                          'pval': pvals[i],
-                          'corrected_pval': pvals_corrected[i],
-                          'threshold': frac}
-                         for i, otu in enumerate(core[frac])
-                         if pvals_corrected[i] <= cfg['max_p']]
-    return results
+    core = [otu for otu in data.keys()
+            if (data[otu].i_present /
+                float(data[otu].n_interest) >= cfg['min_frac'])]
+    pvals = [row_randomize_probability(data[otu])
+             for otu in core]
+    pvals_corrected = correct_pvalues(pvals, cfg['p_val_adj'])
+    return [{'otu': otu,
+             'pval': pvals[i],
+             'corrected_pval': pvals_corrected[i],
+             'presence': data[otu].i_present / float(data[otu].n_interest)}
+            for i, otu in enumerate(core)
+            if pvals_corrected[i] <= cfg['max_p']]
 
 
 def format_results(res, params, cfg):
     """Format the result data as a tsv
     """
     sign_results = (('OTU\tpval\t%s ' +
-                     'corrected pval\tthreshold\n')
+                     'corrected pval\tPresence\n')
                     % cfg['p_val_adj'])
-    for frac in reversed(sorted(res.keys())):
-        for otu in res[frac]:
-            sign_results += '%s\t%s\t%s\t%s\n' % (
-                otu['otu'], otu['pval'],
-                otu['corrected_pval'], int(frac * 100))
+    for otu in list(sorted(
+            res, cmp=cmp_otu_results)):
+        sign_results += '%s\t%s\t%s\t%s\n' % (
+            otu['otu'], otu['pval'],
+            otu['corrected_pval'], otu['presence'])
     if not run_config.IS_PRODUCTION:
         print "Results for configuration: " + cfg['name']
         print sign_results
@@ -135,3 +130,10 @@ def format_results(res, params, cfg):
         'Filename': '%s_results_%s.tsv' % (cfg['name'], params['run_name']),
         'content': base64.b64encode(sign_results)
     }]
+
+
+def cmp_otu_results(a, b):
+    """Compares results for sorting. Sorts first by descending presence, and
+    then by ascending corrected p-value"""
+    p_cmp = cmp(b['presence'], a['presence'])
+    return p_cmp if p_cmp else cmp(a['corrected_pval'], b['corrected_pval'])

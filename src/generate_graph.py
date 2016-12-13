@@ -36,50 +36,46 @@ Stats = namedtuple('Stats', ['otu', 'i_average', 'i_frequency', 'i_error',
 
 def generate_graph(params, inputs, cfg, results):
     attachments = list()
-    for frac in results:
-        otus = [res['otu'] for res in results[frac]]
-        if len(otus) == 0:
-            continue
+    otus = [res['otu'] for res in results]
+    if len(otus) == 0:
+        return attachments
 
-        stats, i_samples, o_samples = get_stats(inputs, otus,
-                                                cfg['group'],
-                                                cfg['out_group'],
-                                                cfg['min_abundance'])
+    stats, i_samples, o_samples = get_stats(inputs, otus,
+                                            cfg['group'],
+                                            cfg['out_group'],
+                                            cfg['min_abundance'])
 
-        # Sort everything by decreasing average presence in interest group
-        stats = list(reversed(sorted(
-            stats, cmp=lambda a, b: cmp(a.i_average, b.i_average)
-        )))
+    # Sort everything by decreasing average presence in interest group
+    stats = list(reversed(sorted(
+        stats, cmp=lambda a, b: cmp(a.i_average, b.i_average)
+    )))
 
-        if run_config.IS_PRODUCTION:
-            attachments.append({
-                'Content-Type': 'image/svg+xml',
-                'Filename': '%s_plot_%s_%s.svg' % (cfg['name'],
-                                                   int(frac * 100),
-                                                   params['run_name']),
-                'content': base64.b64encode(make_graph(stats,
-                                                       cfg['group_name'],
-                                                       cfg['out_group_name'],
-                                                       frac))
-            })
-
-        ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
-        for i in range(len(otus)):
-            ref_text += '%s\t%d of %d\t%d of %d\t%s\n' % (
-                i,
-                stats[i].i_frequency,
-                i_samples,
-                stats[i].o_frequency,
-                o_samples,
-                stats[i].otu)
-
+    if run_config.IS_PRODUCTION:
         attachments.append({
-            'Content-Type': 'text/tab-separated-values',
-            'Filename': '%s_plot_labels_%s_%s.tsv' % (cfg['name'],
-                                                      int(frac * 100),
-                                                      params['run_name']),
-            'content': base64.b64encode(ref_text)
+            'Content-Type': 'image/svg+xml',
+            'Filename': '%s_plot_%s.svg' % (cfg['name'],
+                                            params['run_name']),
+            'content': base64.b64encode(make_graph(stats,
+                                                   cfg['group_name'],
+                                                   cfg['out_group_name']))
         })
+
+    ref_text = 'ID\tInterest Frequency\tOut Frequency\tOTU\n'
+    for i in range(len(otus)):
+        ref_text += '%s\t%d of %d\t%d of %d\t%s\n' % (
+            i,
+            stats[i].i_frequency,
+            i_samples,
+            stats[i].o_frequency,
+            o_samples,
+            stats[i].otu)
+
+    attachments.append({
+        'Content-Type': 'text/tab-separated-values',
+        'Filename': '%s_plot_labels_%s.tsv' % (cfg['name'],
+                                               params['run_name']),
+        'content': base64.b64encode(ref_text)
+    })
     if not run_config.IS_PRODUCTION:
         logging.warn('Graphs not generated because in development mode')
     return attachments
@@ -117,7 +113,7 @@ def standard_error(a):
     return numpy.std(a, ddof=1)/numpy.sqrt(len(a))
 
 
-def make_graph(stats, i_group_name, o_group_name, frac):
+def make_graph(stats, i_group_name, o_group_name):
     width = 0.35
     ind = [i + width/2 for i in range(len(stats))]
     interest = plt.bar(ind, [s.i_average for s in stats],
@@ -130,9 +126,7 @@ def make_graph(stats, i_group_name, o_group_name, frac):
     plt.xlabel('Sample ID')
     plt.xticks([i + width for i in ind], range(len(stats)))
     plt.legend((interest[0], out[0]), (i_group_name, o_group_name))
-    plt.title('Abundance of Core Microbes at %s%% Threshold' %
-              int(frac * 100))
-
+    plt.title('Abundance of Core Microbes')
     out = StringIO.StringIO()
     plt.savefig(out, format='svg')
     plt.clf()
