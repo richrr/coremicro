@@ -18,15 +18,8 @@
 
 from biom.parse import parse_biom_table
 from biom.table import table_factory, SparseOTUTable
-from collections import namedtuple
 
 import run_config
-from probability import row_randomize_probability
-
-
-# Named Tuple to store information about the data in each row
-OTU_Data = namedtuple('OTU_Data', ['n_interest', 'i_present',
-                                   'total', 'present'])
 
 
 def read_table(table_file):
@@ -51,34 +44,35 @@ def read_table(table_file):
                          constructor=SparseOTUTable), original_otus
 
 
-def get_otu_data(table, mapping_dict, i_group, min_abundance):
+def summarize_otu_data(table, mapping_dict, i_group, min_abundance):
     """Gives a summary of the data for each otu to use in processing
     """
     # column number of interest samples
     i_indexes = [i for i, id in enumerate(table.SampleIds)
                  if id in samples(mapping_dict, i_group)]
-    n_interest = len(i_indexes)
+    interest = len(i_indexes)
     total = sum([len(mapping_dict[group]) for group in mapping_dict])
     otu_data = list()
     for vals, otu, md in table.iterObservations():
-        data = OTU_Data(
-            n_interest,
-            num_present([v for i, v in enumerate(vals) if i in i_indexes],
-                        min_abundance),
-            total,
-            num_present(vals, min_abundance)
-        )
+        i_present = len([v for i, v in enumerate(vals)
+                         if i in i_indexes and v > min_abundance])
+        present = len([v for v in vals if v > min_abundance])
         otu_data.append({
             'otu': otu,
-            'data': data,
-            'presence': data.i_present / float(data.n_interest),
-            'pval': row_randomize_probability(data)
+            'total': total,
+            'present': present,
+            'absent': total - present,
+            'interest': interest,
+            'out': total - interest,
+            'i_present': i_present,
+            'i_absent': interest - i_present,
+            'o_present': present - i_present,
+            'o_absent': total - present - (interest - i_present),
         })
     return otu_data
 
 
 def samples(mapping_dict, group):
-    """Get the sample ids for the given group"""
     return [otu for g in group for otu in mapping_dict[g]]
 
 

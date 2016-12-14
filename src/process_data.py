@@ -23,9 +23,10 @@ from time import strptime, mktime
 
 import run_config
 from send_email import send_email
-from parse_inputs import get_otu_data
+from parse_inputs import summarize_otu_data
 from generate_graph import generate_graph
 from correct_p_values import correct_pvalues
+from probability import row_randomize_probability
 
 
 class RunPipeline(pipeline.Pipeline):
@@ -36,9 +37,9 @@ class RunPipeline(pipeline.Pipeline):
 
         attachments = list()
         for cfg in params['run_cfgs']:
-            results = get_signif_otus(inputs, cfg)
-            attachments += format_results(results, params, cfg)
-            attachments += generate_graph(params, inputs, cfg, results)
+            core = process(inputs, cfg)
+            attachments += (format_results(core, cfg) +
+                            generate_graph(inputs, cfg, core))
         elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
             strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
         send_email(('Your data with name %s has been processed' %
@@ -86,25 +87,29 @@ Elapsed time %d.%06d seconds
         self.cleanup()
 
 
-def get_signif_otus(inputs, cfg):
-    """Gives the set of OTUs that are considered to be significantly in the
-    core. The set of all OTUs are first filtered based on their p-value, after
-    correction for multiple sampling. Then they are filtered based on the
-    fraction of interest group samples they are present in"""
-    potential_otus = get_otu_data(inputs['filtered_data'],
-                                  inputs['mapping_dict'], cfg['group'],
-                                  cfg['min_abundance'])
+def process(inputs, cfg):
+    """Finds the core OTUs"""
+    # Get summarized data
+    potential_otus = summarize_otu_data(inputs['filtered_data'],
+                                        inputs['mapping_dict'], cfg['group'],
+                                        cfg['min_abundance'])
+    # Add pval and presence to OTUs
+    for otu in potential_otus:
+        otu['pval'] = row_randomize_probability(otu)
+        otu['presence'] = otu['i_present'] / float(otu['interest'])
+    # Add corrected pval to OTUs
     corrected_pvalues = correct_pvalues(
         [otu['pval'] for otu in potential_otus], cfg['p_val_adj']
     )
     for otu, corrected_pval in zip(potential_otus, corrected_pvalues):
         otu['corrected_pval'] = corrected_pval
+    # Filter down to the core
     return [otu for otu in potential_otus
             if (otu['corrected_pval'] <= cfg['max_p'] and
                 otu['presence'] >= cfg['min_frac'])]
 
 
-def format_results(res, params, cfg):
+def format_results(res, cfg):
     """Format the result data as a tsv
     """
     sign_results = (('OTU\tpval\t%s ' +
@@ -120,13 +125,15 @@ def format_results(res, params, cfg):
         print sign_results
     return [{
         'Content-Type': 'text/plain',
-        'Filename': '%s_results_%s.tsv' % (cfg['name'], params['run_name']),
+        'Filename': '%s_results_%s.tsv' % (cfg['name'], cfg['run_name']),
         'content': base64.b64encode(sign_results)
     }]
 
 
 def cmp_otu_results(a, b):
-    """Compares results for sorting. Sorts first by descending presence, and
-    then by ascending corrected p-value"""
-    p_cmp = cmp(b['presence'], a['presence'])
-    return p_cmp if p_cmp else cmp(a['corrected_pval'], b['corrected_pval'])
+    """Compares results for sorting. Sorts first by descending presence,
+    then by ascending corrected p-value, and finally by OTU name"""
+    res = cmp(b['presence'], a['presence'])
+    res = res if res else cmp(a['corrected_pval'], b['corrected_pval'])
+    res = res if res else cmp(a['otu'], b['otu'])
+    return res

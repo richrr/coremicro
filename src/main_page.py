@@ -58,15 +58,12 @@ class MainPage(webapp2.RequestHandler):
 
         params = {
             'run_name': run_name,
-            'factor': factor,
-            'group': group,
             'to_email': to_email,
             'timestamp': timestamp,
             'user_args': user_args,
-            'include_out': include_out,
+            'factor': factor,
+            'group': group,
             'max_p': max_p,
-            'min_frac': min_frac,
-            'min_abundance': min_abundance,
         }
 
         errors_list, mapping_dict, out_group, filtered_data \
@@ -81,6 +78,7 @@ class MainPage(webapp2.RequestHandler):
 
         params['run_cfgs'] = [
             {
+                'run_name': run_name,
                 'factor': factor,
                 'group': group,
                 'out_group': out_group,
@@ -96,6 +94,7 @@ class MainPage(webapp2.RequestHandler):
 
         if include_out:
             params['run_cfgs'].append({
+                'run_name': run_name,
                 'factor': factor,
                 'group': out_group,
                 'out_group': group,

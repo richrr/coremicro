@@ -34,7 +34,7 @@ Stats = namedtuple('Stats', ['otu', 'i_average', 'i_frequency', 'i_error',
                              'o_average', 'o_frequency', 'o_error'])
 
 
-def generate_graph(params, inputs, cfg, results):
+def generate_graph(inputs, cfg, results):
     attachments = list()
     otus = [res['otu'] for res in results]
     if len(otus) == 0:
@@ -53,8 +53,7 @@ def generate_graph(params, inputs, cfg, results):
     if run_config.IS_PRODUCTION:
         attachments.append({
             'Content-Type': 'image/svg+xml',
-            'Filename': '%s_plot_%s.svg' % (cfg['name'],
-                                            params['run_name']),
+            'Filename': '%s_plot_%s.svg' % (cfg['name'], cfg['run_name']),
             'content': base64.b64encode(make_graph(stats,
                                                    cfg['group_name'],
                                                    cfg['out_group_name']))
@@ -72,8 +71,7 @@ def generate_graph(params, inputs, cfg, results):
 
     attachments.append({
         'Content-Type': 'text/tab-separated-values',
-        'Filename': '%s_plot_labels_%s.tsv' % (cfg['name'],
-                                               params['run_name']),
+        'Filename': '%s_plot_labels_%s.tsv' % (cfg['name'], cfg['run_name']),
         'content': base64.b64encode(ref_text)
     })
     if not run_config.IS_PRODUCTION:

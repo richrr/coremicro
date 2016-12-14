@@ -16,19 +16,17 @@
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 
 
-def row_randomize_probability(data):
+def row_randomize_probability(otu):
     """The probability that if n_interest valsues are chosen from vals the
     number present in the interest group will be as many or greater than what
     was originally found. This is calculated with a one-tailed Fisher's Exact
     Test
     """
-    return (sum([nCr(data.present, need) *
-                 nCr(data.total - data.present,
-                     data.n_interest - need)
-                 for need in xrange(data.i_present,
-                                    min(data.present,
-                                        data.n_interest) + 1)]) /
-            nCr(data.total, data.n_interest))
+    return (sum(
+        [nCr(otu['present'], need) * nCr(otu['absent'], otu['interest'] - need)
+         for need in xrange(otu['i_present'],
+                            min(otu['present'], otu['interest']) + 1)]
+    ) / nCr(otu['total'], otu['interest']))
 
 
 def nCr(n, r):
