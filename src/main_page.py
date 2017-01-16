@@ -20,14 +20,14 @@ import webapp2
 from time import localtime, strftime
 import cPickle
 
-import run_config
-from process_data import RunPipeline
+import web_config
+from run_pipeline import RunPipeline
 from parse_inputs import parse_inputs
 
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
-        template = run_config.JINJA_ENVIRONMENT.get_template('index.html')
+        template = web_config.JINJA_ENVIRONMENT.get_template('index.html')
         self.response.write(template.render())
 
     def post(self):
@@ -108,7 +108,7 @@ class MainPage(webapp2.RequestHandler):
                 }
             )
 
-        template = run_config.JINJA_ENVIRONMENT.get_template('result.html')
+        template = web_config.JINJA_ENVIRONMENT.get_template('result.html')
         if len(errors_list) > 0:
             self.response.write(template.render(errors=errors_list,
                                                 sucess=False))

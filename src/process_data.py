@@ -15,76 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 import logging
-import pipeline
-import cPickle
-import base64
-from datetime import datetime
-from time import strptime, mktime
 
 import run_config
-from send_email import send_email
 from parse_inputs import summarize_otu_data
-from generate_graph import generate_graph
 from correct_p_values import correct_pvalues
 from probability import row_randomize_probability
-
-
-class RunPipeline(pipeline.Pipeline):
-    def run(self, params, inputs):
-        logging.info('Starting run')
-        # Unpack the data
-        inputs['filtered_data'] = cPickle.loads(str(inputs['filtered_data']))
-
-        attachments = list()
-        for cfg in params['run_cfgs']:
-            core = process(inputs, cfg)
-            attachments += (format_results(core, cfg) +
-                            generate_graph(inputs, cfg, core))
-        elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
-            strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-        send_email(('Your data with name %s has been processed' %
-                    params['run_name']),
-                   '''Dear User:
-
-Your data has been processed and is attached. Thanks for using this tool.
-
-Please email us if you have any questions.
-
-The Core Microbiome Team
-
-%s
-Elapsed time: %d.%06d seconds''' % (params['user_args'],
-                                    elapsed_time.seconds,
-                                    elapsed_time.microseconds),
-                   params['to_email'], attachments)
-
-    def finalized(self):
-        logging.info('Finalizing task')
-        params = self.args[0]
-
-        if self.was_aborted:    # There's probably a bug in the code
-            error = 'An unknown error has occured. Please try again. ' +\
-                    'If this occurs again please contact the developers'
-            logging.warn(error)
-            elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
-                strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-            send_email('There was an error in processing your data with ' +
-                       'name %s' % params['run_name'],
-                       '''Dear User:
-
-There was an error in processing your data. The error is listed below.
-
-Please email us if you have any questions.
-
-The Core Microbiome Team
-
-%s
-Elapsed time %d.%06d seconds
-
-%s''' % (params['user_args'], elapsed_time.seconds, elapsed_time.microseconds,
-         error),
-                       params['to_email'])
-        self.cleanup()
 
 
 def process(inputs, cfg):
@@ -120,14 +55,9 @@ def format_results(res, cfg):
         sign_results += '%s\t%s\t%s\t%s\n' % (
             otu['otu'], otu['pval'],
             otu['corrected_pval'], otu['presence'])
-    if not run_config.IS_PRODUCTION:
-        print "Results for configuration: " + cfg['name']
-        print sign_results
-    return [{
-        'Content-Type': 'text/plain',
-        'Filename': '%s_results_%s.tsv' % (cfg['name'], cfg['run_name']),
-        'content': base64.b64encode(sign_results)
-    }]
+    # logging.info("Results for configuration: " + cfg['name'])
+    logging.info(sign_results)
+    return sign_results
 
 
 def cmp_otu_results(a, b):

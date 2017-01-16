@@ -14,6 +14,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
+import jinja2
+import os
 
-# The delimiter used in the groupfile
-DELIM = '\t'
+# Whether this is running in production or development
+IS_PRODUCTION = os.getenv('SERVER_SOFTWARE',
+                          '').startswith('Google App Engine/')
+
+# For templates
+JINJA_ENVIRONMENT = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__),
+                                                '../templates/')),
+    extensions=['jinja2.ext.autoescape'],
+    autoescape=True)

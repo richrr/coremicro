@@ -23,10 +23,10 @@ from collections import namedtuple
 import base64
 
 from parse_inputs import samples
-import run_config
+import web_config
 
 # matplotlib can't be run on the development server
-if run_config.IS_PRODUCTION:
+if web_config.IS_PRODUCTION:
     import matplotlib.pyplot as plt
 
 # Namedtuple to hold statistics calculated for otus
@@ -50,7 +50,7 @@ def generate_graph(inputs, cfg, results):
         stats, cmp=lambda a, b: cmp(a.i_average, b.i_average)
     )))
 
-    if run_config.IS_PRODUCTION:
+    if web_config.IS_PRODUCTION:
         attachments.append({
             'Content-Type': 'image/svg+xml',
             'Filename': '%s_plot_%s.svg' % (cfg['name'], cfg['run_name']),
@@ -74,7 +74,7 @@ def generate_graph(inputs, cfg, results):
         'Filename': '%s_plot_labels_%s.tsv' % (cfg['name'], cfg['run_name']),
         'content': base64.b64encode(ref_text)
     })
-    if not run_config.IS_PRODUCTION:
+    if not web_config.IS_PRODUCTION:
         logging.warn('Graphs not generated because in development mode')
     return attachments
 
