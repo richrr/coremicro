@@ -1,4 +1,5 @@
-# Copyright 2016 Richard Rodrigues, Nyle Rodgers, Mark Williams, Virginia Tech
+# Copyright 2016, 2017 Richard Rodrigues, Nyle Rodgers, Mark Williams,
+# Virginia Tech
 #
 # This file is part of Coremic.
 #
@@ -22,7 +23,7 @@ import cPickle
 
 import web_config
 from run_pipeline import RunPipeline
-from core.parse_inputs import parse_inputs
+from ..core.parse_inputs import parse_inputs
 
 
 class MainPage(webapp2.RequestHandler):

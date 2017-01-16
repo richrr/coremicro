@@ -1,4 +1,5 @@
-# Copyright 2016 Richard Rodrigues, Nyle Rodgers, Mark Williams, Virginia Tech
+# Copyright 2016, 2017 Richard Rodrigues, Nyle Rodgers, Mark Williams,
+# Virginia Tech
 #
 # This file is part of Coremic.
 #
@@ -24,6 +25,6 @@ IS_PRODUCTION = os.getenv('SERVER_SOFTWARE',
 # For templates
 JINJA_ENVIRONMENT = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__),
-                                                '../templates/')),
+                                                '../../templates/')),
     extensions=['jinja2.ext.autoescape'],
     autoescape=True)

@@ -1,4 +1,5 @@
-# Copyright 2016 Richard Rodrigues, Nyle Rodgers, Mark Williams, Virginia Tech
+# Copyright 2016, 2017 Richard Rodrigues, Nyle Rodgers, Mark Williams,
+# Virginia Tech
 #
 # This file is part of Coremic.
 #
@@ -14,12 +15,14 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
-import webapp2
-from main_page import MainPage
-from help_page import HelpPage
 
-# Set up web server
-app = webapp2.WSGIApplication([
-    ('/', MainPage),
-    ('/help', HelpPage),
-], debug=True)
+
+# This is an example of what email_config.py should look like.
+# email_config.py contains api keys, and so is not kept in version control.
+
+# Address to send emails from
+FROM_EMAIL = 'donotreply@example.com'  # Replace with actual address
+
+# Mailjet api key and secret key
+API_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'  # Replace with actual key
+SECRET_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'  # Replace with actual key

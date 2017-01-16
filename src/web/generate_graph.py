@@ -23,7 +23,7 @@ import logging
 from collections import namedtuple
 import base64
 
-from core.parse_inputs import samples
+from ..core.parse_inputs import samples
 import web_config
 
 # matplotlib can't be run on the development server

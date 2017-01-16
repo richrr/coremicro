@@ -1,4 +1,5 @@
-# Copyright 2016 Richard Rodrigues, Nyle Rodgers, Mark Williams, Virginia Tech
+# Copyright 2016, 2017 Richard Rodrigues, Nyle Rodgers, Mark Williams,
+# Virginia Tech
 #
 # This file is part of Coremic.
 #
@@ -23,7 +24,7 @@ from time import strptime, mktime
 
 from send_email import send_email
 from generate_graph import generate_graph
-from core.process_data import process, format_results
+from ..core.process_data import process, format_results
 
 
 class RunPipeline(pipeline.Pipeline):
