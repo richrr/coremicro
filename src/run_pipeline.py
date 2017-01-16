@@ -23,7 +23,7 @@ from time import strptime, mktime
 
 from send_email import send_email
 from generate_graph import generate_graph
-from process_data import process, format_results
+from core.process_data import process, format_results
 
 
 class RunPipeline(pipeline.Pipeline):

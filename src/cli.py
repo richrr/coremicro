@@ -16,8 +16,8 @@
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 import argparse
 import logging
-from process_data import process, format_results
-from parse_inputs import parse_inputs
+from core.process_data import process, format_results
+from core.parse_inputs import parse_inputs
 
 
 def setup_parser():
@@ -32,10 +32,10 @@ def setup_parser():
                                         'group is identified. This should be ',
                                         'a column head in the groupfile'))
     parser.add_argument('group', help=('The value in the factor ',
-                                                'column specifying the ',
-                                                'interest group. Multiple ',
-                                                'values may be specified ',
-                                                'with commas separating them'))
+                                       'column specifying the ',
+                                       'interest group. Multiple ',
+                                       'values may be specified ',
+                                       'with commas separating them'))
     parser.add_argument('-p', '--max_p_val', type=float, metavar='pval',
                         default=0.05, help=('Maximum p-value to include in ',
                                             'the results; defaults to 0.05'))

@@ -22,7 +22,7 @@ import cPickle
 
 import web_config
 from run_pipeline import RunPipeline
-from parse_inputs import parse_inputs
+from core.parse_inputs import parse_inputs
 
 
 class MainPage(webapp2.RequestHandler):
