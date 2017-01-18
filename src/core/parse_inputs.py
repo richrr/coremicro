@@ -133,12 +133,6 @@ def parse_inputs(params, mapping_file, data):
 
     try:
         filtered_data, original_otus = read_table(data)
-        params['user_args'] += (
-            'OTUs before combining duplicates: %s\n' +
-            'OTUs after combining duplicates: %s\n\n\n') % (
-                original_otus,
-                len(filtered_data.ObservationIds)
-            )
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)
 
@@ -147,4 +141,4 @@ def parse_inputs(params, mapping_file, data):
     elif params['max_p'] > 1:
         errors_list.append('Maximum p-value can not be greater than one')
 
-    return (errors_list, mapping_dict, out_group, filtered_data)
+    return (errors_list, mapping_dict, out_group, filtered_data, original_otus)

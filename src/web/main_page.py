@@ -67,8 +67,15 @@ class MainPage(webapp2.RequestHandler):
             'max_p': max_p,
         }
 
-        errors_list, mapping_dict, out_group, filtered_data \
+        errors_list, mapping_dict, out_group, filtered_data, original_otus \
             = parse_inputs(params, mapping_file, data)
+
+        params['user_args'] += (
+            'OTUs before combining duplicates: %s\n' +
+            'OTUs after combining duplicates: %s\n\n\n') % (
+                original_otus,
+                len(filtered_data.ObservationIds)
+            )
 
         params['out_group'] = out_group
         inputs = {

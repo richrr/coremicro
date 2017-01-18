@@ -17,7 +17,6 @@
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 import logging
 
-import run_config
 from parse_inputs import summarize_otu_data
 from correct_p_values import correct_pvalues
 from probability import row_randomize_probability

@@ -74,12 +74,7 @@ if __name__ == '__main__':
         'min_frac': args.min_presence,
         'p_val_adj': args.p_val_correction,
     }
-    cfg['user_args'] = (('You selected the following parameters:' +
-                         '\nFactor: %s\nGroup: %s\n' +
-                         'Pval correction: %s\nMax Pval: %s\n\n\n')
-                        % (cfg['factor'], ', '.join(cfg['group']),
-                           cfg['p_val_adj'], cfg['max_p']))
-    errors_list, mapping_dict, out_group, filtered_data \
+    errors_list, mapping_dict, out_group, filtered_data, original_otus \
         = parse_inputs(cfg, groupfile, datafile)
     if len(errors_list) > 0:
         logging.error(errors_list)
