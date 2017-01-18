@@ -27,6 +27,32 @@ from generate_graph import generate_graph
 from ..core.process_data import process, format_results
 
 
+SUCCESS_EMAIL_SUBJ = 'Your data with name %s has been processed'
+SUCCESS_EMAIL = '''Dear User:
+
+Your data has been processed and is attached. Thanks for using this tool.
+
+Please email us if you have any questions.
+
+The Core Microbiome Team
+
+%s
+Elapsed time: %d.%06d seconds'''
+FAILURE_EMAIL_SUBJ = 'There was an error in processing your data with name %s'
+FAILURE_EMAIL = '''Dear User:
+
+There was an error in processing your data. The error is listed below.
+
+Please email us if you have any questions.
+
+The Core Microbiome Team
+
+%s
+Elapsed time %d.%06d seconds
+
+%s'''
+
+
 class RunPipeline(pipeline.Pipeline):
     def run(self, params, inputs):
         logging.info('Starting run')
@@ -36,26 +62,18 @@ class RunPipeline(pipeline.Pipeline):
         attachments = list()
         for cfg in params['run_cfgs']:
             core = process(inputs, cfg)
-            attachments += ([{
-                'Content-Type': 'text/plain',
-                'Filename': '%s_results_%s.tsv' % (cfg['name'],
-                                                   cfg['run_name']),
-                'content': base64.b64encode(format_results(core, cfg))}] +
-                            generate_graph(inputs, cfg, core))
+            attachments.append({'Content-Type': 'text/plain',
+                                'Filename': '%s_results_%s.tsv' % (
+                                    cfg['name'], cfg['run_name']
+                                ),
+                                'content': base64.b64encode(
+                                    format_results(core, cfg)
+                                )})
+            attachments += generate_graph(inputs, cfg, core)
         elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
             strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-        send_email(('Your data with name %s has been processed' %
-                    params['run_name']),
-                   '''Dear User:
-
-Your data has been processed and is attached. Thanks for using this tool.
-
-Please email us if you have any questions.
-
-The Core Microbiome Team
-
-%s
-Elapsed time: %d.%06d seconds''' % (params['user_args'],
+        send_email(SUCCESS_EMAIL_SUBJ % params['run_name'],
+                   SUCCESS_EMAIL % (params['user_args'],
                                     elapsed_time.seconds,
                                     elapsed_time.microseconds),
                    params['to_email'], attachments)
@@ -70,20 +88,11 @@ Elapsed time: %d.%06d seconds''' % (params['user_args'],
             logging.warn(error)
             elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
                 strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-            send_email('There was an error in processing your data with ' +
-                       'name %s' % params['run_name'],
-                       '''Dear User:
-
-There was an error in processing your data. The error is listed below.
-
-Please email us if you have any questions.
-
-The Core Microbiome Team
-
-%s
-Elapsed time %d.%06d seconds
-
-%s''' % (params['user_args'], elapsed_time.seconds, elapsed_time.microseconds,
-         error),
+            send_email(FAILURE_EMAIL_SUBJ % params['run_name'],
+                       FAILURE_EMAIL % (
+                           params['user_args'],
+                           elapsed_time.seconds,
+                           elapsed_time.microseconds,
+                           error),
                        params['to_email'])
         self.cleanup()
