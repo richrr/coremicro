@@ -44,12 +44,17 @@ def setup_parser():
                         default=0.9, help=('Minimum fractional presence in ',
                                            'the interest group; defaults to ',
                                            '0.9 (90%)'))
+    parser.add_argument('-o', '--max_out_presence', type=float,
+                        metavar='presence',
+                        default=1.0, help=('Maximum fractional presence in ',
+                                           'the out group; defaults to ',
+                                           '1.0 (100%)'))
     parser.add_argument('-a', '--max_absent_abundance', type=float,
                         metavar='abundance',
-                        default=0, help=('Any abundance greater than this ',
-                                         'value is considered to indicate ',
-                                         'that the corresponding OTU is ',
-                                         'present; defaults to 0'))
+                        default=0.0, help=('Any abundance greater than this ',
+                                           'value is considered to indicate ',
+                                           'that the corresponding OTU is ',
+                                           'present; defaults to 0'))
     parser.add_argument('-c', '--p_val_correction', default='b-h',
                         choices=['none', 'bf', 'bf-h', 'b-h'],
                         help=('The method to use for correcting for multiple ',
@@ -72,6 +77,7 @@ if __name__ == '__main__':
         'min_abundance': args.max_absent_abundance,
         'max_p': args.max_p_val,
         'min_frac': args.min_presence,
+        'max_out_presence': args.max_out_presence,
         'p_val_adj': args.p_val_correction,
     }
     errors_list, mapping_dict, out_group, filtered_data, original_otus \

@@ -48,6 +48,7 @@ class MainPage(webapp2.RequestHandler):
         include_out = bool(self.request.get('include_out'))
         max_p = float(self.request.get('max_p'))
         min_frac = float(self.request.get('min_frac'))
+        max_out_presence = float(self.request.get('max_out_presence'))
         min_abundance = float(self.request.get('min_abundance'))
 
         to_email = self.request.get('email')
@@ -93,6 +94,7 @@ class MainPage(webapp2.RequestHandler):
                 'group_name': group_name,
                 'out_group_name': out_group_name,
                 'min_abundance': min_abundance,
+                'max_out_presence': max_out_presence,
                 'name': group_name,
                 'max_p': max_p,
                 'min_frac': min_frac,
@@ -109,6 +111,7 @@ class MainPage(webapp2.RequestHandler):
                 'group_name': out_group_name,
                 'out_group_name': group_name,
                 'min_abundance': min_abundance,
+                'max_out_presence': max_out_presence,
                 'name': out_group_name,
                 'max_p': max_p,
                 'min_frac': min_frac,

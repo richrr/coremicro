@@ -32,6 +32,7 @@ def process(inputs, cfg):
     for otu in potential_otus:
         otu['pval'] = row_randomize_probability(otu)
         otu['presence'] = otu['i_present'] / float(otu['interest'])
+        otu['out_presence'] = otu['o_present'] / float(otu['out'])
     # Add corrected pval to OTUs
     corrected_pvalues = correct_pvalues(
         [otu['pval'] for otu in potential_otus], cfg['p_val_adj']
@@ -41,20 +42,21 @@ def process(inputs, cfg):
     # Filter down to the core
     return [otu for otu in potential_otus
             if (otu['corrected_pval'] <= cfg['max_p'] and
-                otu['presence'] >= cfg['min_frac'])]
+                otu['presence'] >= cfg['min_frac'] and
+                otu['out_presence'] <= cfg['max_out_presence'])]
 
 
 def format_results(res, cfg):
     """Format the result data as a tsv
     """
-    sign_results = (('OTU\tpval\t%s ' +
-                     'corrected pval\tPresence\n')
+    sign_results = (('OTU\tpval\t%s Corrected Pval\t' +
+                     'Presence\tOut Group Presence\n')
                     % cfg['p_val_adj'])
     for otu in list(sorted(
             res, cmp=cmp_otu_results)):
-        sign_results += '%s\t%s\t%s\t%s\n' % (
+        sign_results += '%s\t%s\t%s\t%s\t%s\n' % (
             otu['otu'], otu['pval'],
-            otu['corrected_pval'], otu['presence'])
+            otu['corrected_pval'], otu['presence'], otu['out_presence'])
     # logging.info("Results for configuration: " + cfg['name'])
     logging.info(sign_results)
     return sign_results

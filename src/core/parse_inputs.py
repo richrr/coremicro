@@ -85,8 +85,15 @@ def num_present(vals, min_abundance):
 def get_categ_samples_dict(mapping_info_list, factor):
     """Turn the groupfile in to a dictionary from factor labels to sample ids
     """
+
     # It is assumed that the first line is the header
     labels = mapping_info_list[0].strip().strip('#').split(run_config.DELIM)
+    if 'SampleID' not in labels:
+        '"SampleID" not in the headers of the sample ' + '<-> group info file'
+    if factor not in labels:
+        ('"%s" not in the headers of the sample <-> ' + 'group info file' %
+         factor)
+
     index_sampleid = labels.index('SampleID')
     index_categ = labels.index(factor)
     local_dict = dict()
@@ -108,16 +115,8 @@ def parse_inputs(params, mapping_file, data):
     factor = params['factor']
     group = params['group']
 
-    labels = mapping_file[0].strip().strip('#').split(run_config.DELIM)
-
     errors_list = list()
 
-    if 'SampleID' not in labels:
-        errors_list.append('"SampleID" not in the headers of the sample ' +
-                           '<-> group info file')
-    if factor not in labels:
-        errors_list.append(('"%s" not in the headers of the sample <-> ' +
-                            'group info file') % factor)
     mapping_dict = get_categ_samples_dict(mapping_file, factor)
     for l in group:
         if l not in mapping_dict.keys():
