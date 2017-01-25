@@ -161,9 +161,17 @@ These are some of the options that need to provided:
 
   <dt>Minimum Fractional Presence</dt>
   <dd>The minimum portion of the interest group samples that an OTU must be
-    present in to be considered a part of the score. This value should be
+    present in to be considered a part of the core. This value should be
     between 0 and 1. A value of 0.9 would mean that an OTU must be present
     in at least 90% of the interest group samples to be considered for the core.
+  </dd>
+
+  <dt>Maximum Out-Group Fractional Presence</dt>
+  <dd>The maximum portion of the out group samples that an OTU can be
+    present in and considered a part of the core. This value should be
+    between 0 and 1. A value of 0.75 would mean that an OTU must be present
+    in less than 75% of the out group samples to be considered for the core.
+  </dd>
     
   <dt>Minimum Abundance</dt>
   <dd>The minimum abundance a measurement must have to be considered present.
