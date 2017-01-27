@@ -77,27 +77,20 @@ def samples(mapping_dict, group):
     return [otu for g in group for otu in mapping_dict[g]]
 
 
-def num_present(vals, min_abundance):
-    """Get the number of values in vals that are greater than min_abundance"""
-    return sum([v > min_abundance for v in vals])
-
-
-def get_categ_samples_dict(mapping_info_list, factor):
+def parse_groupfile(groupfile, factor):
     """Turn the groupfile in to a dictionary from factor labels to sample ids
     """
-
     # It is assumed that the first line is the header
-    labels = mapping_info_list[0].strip().strip('#').split(run_config.DELIM)
+    labels = groupfile[0].strip().strip('#').split(run_config.DELIM)
     if 'SampleID' not in labels:
-        '"SampleID" not in the headers of the sample ' + '<-> group info file'
+        raise ValueError('"SampleID" not in the headers of the groupfile')
     if factor not in labels:
-        ('"%s" not in the headers of the sample <-> ' + 'group info file' %
-         factor)
+        raise ValueError('"%s" not in the headers of the groupfile' % factor)
 
     index_sampleid = labels.index('SampleID')
     index_categ = labels.index(factor)
     local_dict = dict()
-    for l in mapping_info_list:
+    for l in groupfile:
         if not l or l.strip()[0] == '#':  # Line is blank or comment
             continue
         key, val = map(l.strip().split(run_config.DELIM).__getitem__,
@@ -109,35 +102,37 @@ def get_categ_samples_dict(mapping_info_list, factor):
     return local_dict
 
 
-def parse_inputs(params, mapping_file, data):
+def parse_inputs(params, groupfile, data):
     """Validate that the given inputs are usable and parse them into usable
     formats"""
-    factor = params['factor']
-    group = params['group']
 
     errors_list = list()
 
-    mapping_dict = get_categ_samples_dict(mapping_file, factor)
-    for l in group:
+    try:
+        mapping_dict = parse_groupfile(groupfile, params['factor'])
+    except ValueError as e:
+        errors_list.append(e.message)
+    for l in params['group']:
         if l not in mapping_dict.keys():
             errors_list.append(
-                'Interest group label %s is not in groupfile' % l
-            )
+                'Interest group label %s is not in groupfile' % l)
 
-    try:
-        out_group = mapping_dict.keys()
-        [out_group.remove(l) for l in group]
-    except ValueError:
-        pass                    # already handled previously
+    out_group = mapping_dict.keys()
+    [out_group.remove(l) for l in params['group']]
 
     try:
         filtered_data, original_otus = read_table(data)
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)
 
-    if params['max_p'] < 0:
-        errors_list.append('Maximum p-value can not be negative')
-    elif params['max_p'] > 1:
-        errors_list.append('Maximum p-value can not be greater than one')
+    if params['max_p'] < 0 or params['max_p'] > 1:
+        errors_list.append('Maximum p-value must be in the range zero to one')
+    if params['min_frac'] < 0 or params['min_frac'] > 1:
+        errors_list.append('Minimum interest group presence must be in range' +
+                           ' zero to one')
+    if params['max_out_presence'] < 0 or params['max_out_presence'] > 1:
+        errors_list.append('Maximum out-group presence must be in range' +
+                           ' zero to one')
+    # Should verify p-value-adjust is valid value
 
     return (errors_list, mapping_dict, out_group, filtered_data, original_otus)
