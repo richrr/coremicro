@@ -17,27 +17,31 @@
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 import logging
 
-from parse_inputs import summarize_otu_data
 from correct_p_values import correct_pvalues
 from probability import row_randomize_probability
 
 
 def process(inputs, cfg):
     """Finds the core OTUs"""
-    # Get summarized data
-    potential_otus = summarize_otu_data(inputs['filtered_data'],
-                                        inputs['mapping_dict'], cfg['group'],
-                                        cfg['min_abundance'])
-    # Add pval and presence to OTUs
-    for otu in potential_otus:
-        otu['pval'] = row_randomize_probability(otu)
-        otu['presence'] = otu['i_present'] / float(otu['interest'])
-        otu['out_presence'] = otu['o_present'] / float(otu['out'])
-    # Add corrected pval to OTUs
-    corrected_pvalues = correct_pvalues(
-        [otu['pval'] for otu in potential_otus], cfg['p_val_adj']
-    )
-    for otu, corrected_pval in zip(potential_otus, corrected_pvalues):
+    i_indexes = [i for i, id in enumerate(inputs['filtered_data'].SampleIds)
+                 if id in [otu
+                           for g in cfg['group']
+                           for otu in inputs['mapping_dict'][g]]]
+    potential_otus = list()
+    for vals, otu, md in inputs['filtered_data'].iterObservations():
+        otu_summary = make_otu_sumary(
+            otu,
+            total=len(vals),
+            present=len(filter_min_val(vals, cfg['min_abundance'])),
+            interest=len(i_indexes),
+            i_present=len(filter_min_val(filter_indexes(vals, i_indexes),
+                                         cfg['min_abundance'])))
+        otu_summary['pval'] = row_randomize_probability(otu_summary)
+        potential_otus.append(otu_summary)
+
+    pvals = [otu['pval'] for otu in potential_otus]
+    for otu, corrected_pval in zip(potential_otus,
+                                   correct_pvalues(pvals, cfg['p_val_adj'])):
         otu['corrected_pval'] = corrected_pval
     # Filter down to the core
     return [otu for otu in potential_otus
@@ -46,9 +50,45 @@ def process(inputs, cfg):
                 otu['out_presence'] <= cfg['max_out_presence'])]
 
 
+def make_otu_sumary(otu, total, present, interest, i_present):
+    return {
+        'otu': otu,
+        'total': total,
+        'present': present,
+        'absent': total - present,
+        'interest': interest,
+        'out': total - interest,
+        'i_present': i_present,
+        'i_absent': interest - i_present,
+        'o_present': present - i_present,
+        'o_absent': total - present - (interest - i_present),
+        'presence': i_present / float(interest),
+        'out_presence': (present - i_present) / float(total - interest)
+    }
+
+
+def filter_indexes(vals, indexes):
+    """Returns a list of the values in vals that are at one of the
+    indices in indexes"""
+    return [v for i, v in enumerate(vals) if i in indexes]
+
+
+def filter_min_val(vals, min_val):
+    """Returns a list of the values in vals that are at or above the
+    specified minimum abundance"""
+    return [v for v in vals if v > min_val]
+
+
 def format_results(res, cfg):
     """Format the result data as a tsv
     """
+    def cmp_otu_results(a, b):
+        """Compares results for sorting. Sorts first by descending presence,
+        then by ascending corrected p-value, and finally by OTU name"""
+        return (cmp(b['presence'], a['presence']) or
+                cmp(a['corrected_pval'], b['corrected_pval']) or
+                cmp(a['otu'], b['otu']))
+
     sign_results = (('OTU\tpval\t%s Corrected Pval\t' +
                      'Presence\tOut Group Presence\n')
                     % cfg['p_val_adj'])
@@ -60,12 +100,3 @@ def format_results(res, cfg):
     # logging.info("Results for configuration: " + cfg['name'])
     logging.info(sign_results)
     return sign_results
-
-
-def cmp_otu_results(a, b):
-    """Compares results for sorting. Sorts first by descending presence,
-    then by ascending corrected p-value, and finally by OTU name"""
-    res = cmp(b['presence'], a['presence'])
-    res = res if res else cmp(a['corrected_pval'], b['corrected_pval'])
-    res = res if res else cmp(a['otu'], b['otu'])
-    return res

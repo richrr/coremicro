@@ -45,38 +45,6 @@ def read_table(table_file):
                          constructor=SparseOTUTable), original_otus
 
 
-def summarize_otu_data(table, mapping_dict, i_group, min_abundance):
-    """Gives a summary of the data for each otu to use in processing
-    """
-    # column number of interest samples
-    i_indexes = [i for i, id in enumerate(table.SampleIds)
-                 if id in samples(mapping_dict, i_group)]
-    interest = len(i_indexes)
-    total = sum([len(mapping_dict[group]) for group in mapping_dict])
-    otu_data = list()
-    for vals, otu, md in table.iterObservations():
-        i_present = len([v for i, v in enumerate(vals)
-                         if i in i_indexes and v > min_abundance])
-        present = len([v for v in vals if v > min_abundance])
-        otu_data.append({
-            'otu': otu,
-            'total': total,
-            'present': present,
-            'absent': total - present,
-            'interest': interest,
-            'out': total - interest,
-            'i_present': i_present,
-            'i_absent': interest - i_present,
-            'o_present': present - i_present,
-            'o_absent': total - present - (interest - i_present),
-        })
-    return otu_data
-
-
-def samples(mapping_dict, group):
-    return [otu for g in group for otu in mapping_dict[g]]
-
-
 def parse_groupfile(groupfile, factor):
     """Turn the groupfile in to a dictionary from factor labels to sample ids
     """

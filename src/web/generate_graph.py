@@ -23,7 +23,6 @@ import logging
 from collections import namedtuple
 import base64
 
-from ..core.parse_inputs import samples
 import web_config
 
 # matplotlib can't be run on the development server
@@ -33,6 +32,10 @@ if web_config.IS_PRODUCTION:
 # Namedtuple to hold statistics calculated for otus
 Stats = namedtuple('Stats', ['otu', 'i_average', 'i_frequency', 'i_error',
                              'o_average', 'o_frequency', 'o_error'])
+
+
+def samples(mapping_dict, group):
+    return [otu for g in group for otu in mapping_dict[g]]
 
 
 def generate_graph(inputs, cfg, results):
