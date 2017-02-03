@@ -15,7 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
-from correct_p_values import correct_pvalues
+from pval import getpval, correct_pvalues
 from otu import Otu
 
 
@@ -28,16 +28,19 @@ def process(inputs, cfg):
     potential_otus = [Otu(vals, name, cfg['min_abundance'], i_indexes)
                       for vals, name, md
                       in inputs['filtered_data'].iterObservations()]
-
-    pvals = [otu.pval for otu in potential_otus]
+    pvals = list()
+    for otu in potential_otus:
+        pval = getpval(otu)
+        otu.pval = pval
+        pvals.append(pval)
     for otu, corrected_pval in zip(potential_otus,
                                    correct_pvalues(pvals, cfg['p_val_adj'])):
         otu.corrected_pval = corrected_pval
     # Filter down to the core
     return [otu for otu in potential_otus
             if (otu.corrected_pval <= cfg['max_p'] and
-                otu.i_presence_frac >= cfg['min_frac'] and
-                otu.o_presence_frac <= cfg['max_out_presence'])]
+                otu.interest().frac() >= cfg['min_frac'] and
+                otu.out().frac() <= cfg['max_out_presence'])]
 
 
 def format_results(res, cfg):

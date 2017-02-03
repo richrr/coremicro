@@ -17,6 +17,36 @@
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 
 
+def getpval(otu):
+    """The probability that if n_interest valsues are chosen from vals the
+    number present in the interest group will be as many or greater than what
+    was originally found. This is calculated with a one-tailed Fisher's Exact
+    Test
+    """
+    return sum(
+        [nCr(otu.present().count(), need) * nCr(otu.absent().count(),
+                                                otu.interest().count() - need)
+         for need in xrange(otu.interest().present().count(),
+                            min(otu.present().count(),
+                                otu.interest().count()) + 1)]
+    ) / nCr(otu.count(), otu.interest().count())
+
+
+def nCr(n, r):
+    """n Choose r
+    Uses floating point arithemetic
+    """
+    assert 0 <= n
+    assert 0 <= r and r <= n
+    num = 1.0
+    denom = 1.0
+    for t in xrange(1, min(r, n - r) + 1):
+        num *= n
+        denom *= t
+        n -= 1
+    return num / denom
+
+
 def correct_pvalues(pvalues, correction_type):
     """Applies the given correction method to the given pvalues to correct for
     multiple testing errors"""

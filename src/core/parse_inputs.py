@@ -20,7 +20,8 @@
 from biom.parse import parse_biom_table
 from biom.table import table_factory, SparseOTUTable
 
-import run_config
+# groupfile delimitere
+DELIM = '\t'
 
 
 def read_table(table_file):
@@ -49,7 +50,7 @@ def parse_groupfile(groupfile, factor):
     """Turn the groupfile in to a dictionary from factor labels to sample ids
     """
     # It is assumed that the first line is the header
-    labels = groupfile[0].strip().strip('#').split(run_config.DELIM)
+    labels = groupfile[0].strip().strip('#').split(DELIM)
     if 'SampleID' not in labels:
         raise ValueError('"SampleID" not in the headers of the groupfile')
     if factor not in labels:
@@ -61,7 +62,7 @@ def parse_groupfile(groupfile, factor):
     for l in groupfile:
         if not l or l.strip()[0] == '#':  # Line is blank or comment
             continue
-        key, val = map(l.strip().split(run_config.DELIM).__getitem__,
+        key, val = map(l.strip().split(DELIM).__getitem__,
                        [index_categ, index_sampleid])
         if key in local_dict:
             local_dict[key].append(val)

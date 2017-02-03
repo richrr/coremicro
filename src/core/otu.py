@@ -1,17 +1,4 @@
-from probability import row_randomize_probability
 from functools import total_ordering
-
-
-def filter_present(vals, min_val):
-    """Returns a list of the values in vals that are above the
-    specified minimum abundance"""
-    return [v for v in vals if v > min_val]
-
-
-def filter_absent(vals, min_val):
-    """Returns a list of values in vals that are at or below the specified
-    minimum abundance"""
-    return [v for v in vals if v <= min_val]
 
 
 @total_ordering             # Only have to implement __lt__ and __eq__ for cmp
@@ -20,47 +7,64 @@ class Otu:
         """Construct from a list of ordered values, otu name, minimum abundance
         to be present, and list of indexes of the interest group"""
         # Store the inputs
+        self.name = name
         self.i_indexes = i_indexes
         self.min_abundance = min_abundance
-        self.name = name
         self.values = values
-        # Form interest and out groups
-        self.i_values = [v for i, v in enumerate(values) if i in i_indexes]
-        self.o_values = [v for i, v in enumerate(values) if i not in i_indexes]
-        # Whole table stats
-        self.total = len(values)
-        self.present = len(filter_present(self.values, self.min_abundance))
-        self.absent = len(filter_absent(self.values, self.min_abundance))
-        self.interest = len(self.i_values)
-        # Interest group stats
-        self.i_present = len(filter_present(self.i_values, self.min_abundance))
-        self.i_absent = len(filter_absent(self.i_values, self.min_abundance))
-        self.i_presence_frac = self.i_present / float(self.interest)
-        # Out group stats
-        self.out = len(self.o_values)
-        self.o_present = len(filter_present(self.o_values, self.min_abundance))
-        self.o_absent = len(filter_absent(self.o_values, self.min_abundance))
-        self.o_presence_frac = self.o_present / float(self.interest)
-        # pval
-        self.pval = row_randomize_probability(self)
+
+    def child(self, values):
+        "Returns a copy of this with it's values replaced with the given"
+        return Otu(values, self.name, self.min_abundance, self.i_indexes)
+
+    def present(self):
+        "Replaces all non-present values with None"
+        return self.child([v if v > self.min_abundance else None
+                           for v in self.values])
+
+    def absent(self):
+        "Replaces all non-absent values with None"
+        return self.child([v if v <= self.min_abundance else None
+                           for v in self.values])
+
+    def interest(self):
+        "Replaces all non-interest values with None"
+        return self.child([v if i in self.i_indexes else None
+                           for i, v in enumerate(self.values)])
+
+    def out(self):
+        "Replaces all non-out values with None"
+        return self.child([v if i not in self.i_indexes else None
+                           for i, v in enumerate(self.values)])
+
+    def count(self):
+        return len([v for v in self.values if v is not None])
+
+    def frac(self):
+        "Returns the fraction of values that are present"
+        return (self.present().count()) / float(self.count())
 
     def __lt__(self, other):
-        """Comparison for sorting. Greatest i_presence_frac is smallest, with
-        ties broken first by least p-value and finally by first
-        (alphabetically) OTU name"""
-        return (self.i_presence_frac > other.i_presence_frac or
+        """Comparison for sorting. Greatest interest presence frac is smallest,
+        with ties broken first by least p-value and finally by first
+        (alphabetically) OTU name. Corrected_pval must have been calculated
+        first"""
+        return ((self.interest().frac() >
+                 other.interest().frac()) or
                 self.corrected_pval < other.corrected_pval or
-                self.otu < other.otu)
+                self.name < other.name)
 
     def __eq__(self, other):
-        """Equality for sorting. Equal if equal i_presence_frac, corrected_pval,
-        and OTU name (should never happen in use)"""
-        return (self.i_presence_frac == other.i_presence_frac and
+        """Equality for sorting. Equal if equal interest presence frac,
+        corrected_pval, and OTU name (should never happen in use)
+        Corrected_pval must have been calculated first"""
+        return ((self.interest().presence_frac() ==
+                 other.interest().presence_frac()) and
                 self.corrected_pval == other.corrected_pval and
-                self.otu == other.otu)
+                self.name == other.name)
 
     def __str__(self):
-        """Print summary of OTU as TSV line"""
+        """Print summary of OTU as TSV line. pval and corrected_pval must have
+        been added first"""
         return '\t'.join(map(str, [self.name, self.pval, self.corrected_pval,
-                                   self.i_presence_frac,
-                                   self.o_presence_frac]))
+                                   self.interest().frac(),
+                                   self.out().frac()]))
