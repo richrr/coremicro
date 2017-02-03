@@ -25,19 +25,18 @@ def process(inputs, cfg):
                     for otu in inputs['mapping_dict'][g]]
     i_indexes = [i for i, id in enumerate(inputs['filtered_data'].SampleIds)
                  if id in interest_ids]
-    potential_otus = [Otu(vals, name, cfg['min_abundance'], i_indexes)
-                      for vals, name, md
-                      in inputs['filtered_data'].iterObservations()]
+    otus = [Otu(vals, name, cfg['min_abundance'], i_indexes)
+            for vals, name, md in inputs['filtered_data'].iterObservations()]
     pvals = list()
-    for otu in potential_otus:
+    for otu in otus:
         pval = getpval(otu)
         otu.pval = pval
         pvals.append(pval)
-    for otu, corrected_pval in zip(potential_otus,
+    for otu, corrected_pval in zip(otus,
                                    correct_pvalues(pvals, cfg['p_val_adj'])):
         otu.corrected_pval = corrected_pval
     # Filter down to the core
-    return [otu for otu in potential_otus
+    return [otu for otu in otus
             if (otu.corrected_pval <= cfg['max_p'] and
                 otu.interest_frac >= cfg['min_frac'] and
                 otu.out_frac <= cfg['max_out_presence'])]
@@ -46,7 +45,16 @@ def process(inputs, cfg):
 def format_results(res, cfg):
     """Format the result data as a tsv
     """
-    header = '\t'.join(['OTU', 'Pval', (cfg['p_val_adj'] + ' Corrected Pval'),
-                        'Interest Group Presence', 'Out Group Presence'])
+    inputs = '#' + '\t'.join(['Factor: ' + cfg['factor'],
+                              'Group: ' + ', '.join(cfg['group']),
+                              'Max Corrected p-val: %f' % cfg['max_p'],
+                              'Min Presence: %f' % cfg['min_frac'],
+                              'Max Out Presence: %f' % cfg['max_out_presence'],
+                              'Min Abundance: %f' % cfg['min_abundance'],
+                              'Correction Type: ' + cfg['p_val_adj'],
+                              ])
+    header = '#' + '\t'.join(['OTU', 'Pval', 'Corrected Pval',
+                              'Interest Group Presence', 'Out Group Presence'])
     # logging.info("Results for configuration: " + cfg['name'])
-    return '\n'.join([header] + [str(otu) for otu in list(sorted(res))])
+    return '\n'.join([inputs, header] +
+                     [str(otu) for otu in list(sorted(res))])
