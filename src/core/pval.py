@@ -24,12 +24,10 @@ def getpval(otu):
     Test
     """
     return sum(
-        [nCr(otu.present().count(), need) * nCr(otu.absent().count(),
-                                                otu.interest().count() - need)
-         for need in xrange(otu.interest().present().count(),
-                            min(otu.present().count(),
-                                otu.interest().count()) + 1)]
-    ) / nCr(otu.count(), otu.interest().count())
+        [nCr(otu.present, need) * nCr(otu.absent, otu.interest - need)
+         for need in xrange(otu.interest_present,
+                            min(otu.present, otu.interest) + 1)]
+    ) / nCr(otu.total, otu.interest)
 
 
 def nCr(n, r):

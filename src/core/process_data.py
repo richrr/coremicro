@@ -39,8 +39,8 @@ def process(inputs, cfg):
     # Filter down to the core
     return [otu for otu in potential_otus
             if (otu.corrected_pval <= cfg['max_p'] and
-                otu.interest().frac() >= cfg['min_frac'] and
-                otu.out().frac() <= cfg['max_out_presence'])]
+                otu.interest_frac >= cfg['min_frac'] and
+                otu.out_frac <= cfg['max_out_presence'])]
 
 
 def format_results(res, cfg):
