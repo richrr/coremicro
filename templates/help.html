@@ -213,9 +213,9 @@ These are some of the options that need to provided:
 
 <h2 id="method">Method Details</h2>
 Currently, the tool uses presence absence data to identify core
-microbiome OTUs. <br>
-<img src="static/images/ms3-core-microb-overflow-latest-orig-data-details-all-data-6.jpg" 
-     alt="Algorithm" width="600" height="606"> <br>
+microbiome OTUs. A one tailed Fischer's exact test is used to filter the data to OTUs that are significantly more present in the interest group than in the out group. After this, the results are filtered again based on fractional presence in the interest group and out group, yeilding the final results.<br>
+<img src="static/images/ms3-core-microb-overflow-latest-website.svg" 
+     alt="Algorithm" width="600"> <br>
 
 Future versions of this tool will include more complicated algorithms.
 
