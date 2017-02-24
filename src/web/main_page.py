@@ -66,6 +66,8 @@ class MainPage(webapp2.RequestHandler):
             'factor': factor,
             'group': group,
             'max_p': max_p,
+            'min_frac': min_frac,
+            'max_out_presence': max_out_presence,
         }
 
         errors_list, mapping_dict, out_group, filtered_data, original_otus \
