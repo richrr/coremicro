@@ -40,7 +40,7 @@ def samples(mapping_dict, group):
 
 def generate_graph(inputs, cfg, results):
     attachments = list()
-    otus = [res['otu'] for res in results]
+    otus = [otu.name for otu in results]
     if len(otus) == 0:
         return attachments
 
