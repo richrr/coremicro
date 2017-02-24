@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 # Copyright 2016, 2017 Richard Rodrigues, Nyle Rodgers, Mark Williams,
 # Virginia Tech
 #
@@ -16,7 +17,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 from ete3 import Tree, TreeStyle, faces, TextFace, RectFace
-from colour import Color
 import sys
 import csv
 import argparse
@@ -122,13 +122,13 @@ def parse_output(filename):
     with open(filename) as tsv:
         reader = csv.reader(tsv, delimiter='\t')
         for row in reader:
-            if row[0] == '' or row[0] == 'OTU':
+            if row[0] == '' or row[0] == 'OTU' or row[0].strip()[0] == '#':
                 continue
             core.append({
                 'otu': row[0],
                 'pval': float(row[1]),
                 'corrected_pval': float(row[2]),
-                'threshold': int(row[3]),
+                'threshold': float(row[3]),
             })
     return core
 
