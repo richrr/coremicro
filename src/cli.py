@@ -61,6 +61,15 @@ def setup_parser():
                               'testing; valid options are "none", "bf" ',
                               '(Bonferroni), "bf-h" (Bonferroni-Holm), and ',
                               '"b-h" (Benjamini-Hochberg, the default)'))
+    parser.add_argument('-r', '--relative', dest='relative',
+                        action='store_true',
+                        help=('Convert the input datatable to relative ',
+                              'abundance, rather than absolute abundance. ',
+                              'I.E. abundance values are a percentage of ',
+                              'each sample. If this is set then the maximum ',
+                              'absent abundance should also be a relative ',
+                              '(0 to 1) value.'))
+    parser.set_defaults(relative=False)
     return parser
 
 
@@ -79,6 +88,7 @@ if __name__ == '__main__':
         'min_frac': args.min_presence,
         'max_out_presence': args.max_out_presence,
         'p_val_adj': args.p_val_correction,
+        'make_relative': args.relative,
     }
     errors_list, mapping_dict, out_group, filtered_data, original_otus \
         = parse_inputs(cfg, groupfile, datafile)

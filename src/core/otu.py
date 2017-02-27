@@ -1,3 +1,4 @@
+import numpy
 from functools import total_ordering
 
 
@@ -21,9 +22,22 @@ def out(values, i_indexes):
     return [v if i not in i_indexes else None for i, v in enumerate(values)]
 
 
+def mean(values):
+    """Calculate the mean of the given list of values. None values are treated
+    as not existing"""
+    return numpy.mean([v for v in values if v is not None])
+
+
 def count(values):
     """Number of non-None values in values"""
     return len([v for v in values if v is not None])
+
+
+def standard_error(values):
+    """Standard error of the given list of values, treating None values as not
+    existing"""
+    return (numpy.std([v for v in values if v is not None], ddof=1) /
+            numpy.sqrt(len(values)))
 
 
 @total_ordering             # Only have to implement __lt__ and __eq__ for cmp
@@ -41,8 +55,12 @@ class Otu:
         out_values = out(values, i_indexes)
         self.interest_present = count(present(interest_values, min_abundance))
         self.interest_absent = count(absent(interest_values, min_abundance))
+        self.interest_mean = mean(interest_values)
+        self.interest_error = standard_error(interest_values)
         self.out_present = count(present(out_values, min_abundance))
         self.out_absent = count(absent(out_values, min_abundance))
+        self.out_mean = mean(out_values)
+        self.out_error = standard_error(out_values)
 
         self.interest = self.interest_present + self.interest_absent
         self.out = self.out_present + self.out_absent

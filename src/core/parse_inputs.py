@@ -24,7 +24,7 @@ from biom.table import table_factory, SparseOTUTable
 DELIM = '\t'
 
 
-def read_table(table_file):
+def read_table(table_file, normalize=False):
     """Read in the input datafile and combine any doubled OTUs
     """
     parsed_table = parse_biom_table(table_file)
@@ -42,8 +42,20 @@ def read_table(table_file):
 
     observation_ids = otu_data.keys()
     data = [otu_data[o] for o in observation_ids]
+    if (normalize):
+        data = normalize_columns(data)
     return table_factory(data, sample_ids, observation_ids,
                          constructor=SparseOTUTable), original_otus
+
+
+def normalize_columns(data):
+    """Adjust the given two dimensional array so that the sum of the values in
+    each column in one"""
+    for i in range(len(data[0])):
+        total = sum([row[i] for row in data])
+        for row in data:
+            row[i] = row[i] / float(total)
+    return data
 
 
 def parse_groupfile(groupfile, factor):
@@ -90,7 +102,8 @@ def parse_inputs(params, groupfile, data):
     [out_group.remove(l) for l in params['group']]
 
     try:
-        filtered_data, original_otus = read_table(data)
+        filtered_data, original_otus = read_table(data,
+                                                  params['make_relative'])
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)
 

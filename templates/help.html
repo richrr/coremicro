@@ -172,7 +172,14 @@ These are some of the options that need to provided:
     between 0 and 1. A value of 0.75 would mean that an OTU must be present
     in less than 75% of the out group samples to be considered for the core.
   </dd>
-    
+
+  <dt>Make Abundance Relative</dt>
+  <dd>If this is checked then all values in the input datafile will be
+    converted to relative abundance value, from absolute abundance values.
+    The values will be adjusted such that the sum of the abundances for
+    each sample adds up to 1. Note that if this is checked the Minimum
+    Abundance should be specified as a relative (0 to 1) abundance as well.</dd>
+  
   <dt>Minimum Abundance</dt>
   <dd>The minimum abundance a measurement must have to be considered present.
     This can be a relative or absolute abundance depending on which the

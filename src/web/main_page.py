@@ -49,6 +49,7 @@ class MainPage(webapp2.RequestHandler):
         max_p = float(self.request.get('max_p'))
         min_frac = float(self.request.get('min_frac'))
         max_out_presence = float(self.request.get('max_out_presence'))
+        make_relative = bool(self.request.get('make_relative'))
         min_abundance = float(self.request.get('min_abundance'))
 
         to_email = self.request.get('email')
@@ -68,6 +69,7 @@ class MainPage(webapp2.RequestHandler):
             'max_p': max_p,
             'min_frac': min_frac,
             'max_out_presence': max_out_presence,
+            'make_relative': make_relative,
         }
 
         errors_list, mapping_dict, out_group, filtered_data, original_otus \
@@ -87,22 +89,21 @@ class MainPage(webapp2.RequestHandler):
             'filtered_data': cPickle.dumps(filtered_data),
         }
 
-        params['run_cfgs'] = [
-            {
-                'run_name': run_name,
-                'factor': factor,
-                'group': group,
-                'out_group': out_group,
-                'group_name': group_name,
-                'out_group_name': out_group_name,
-                'min_abundance': min_abundance,
-                'max_out_presence': max_out_presence,
-                'name': group_name,
-                'max_p': max_p,
-                'min_frac': min_frac,
-                'p_val_adj': p_val_adj,
-            }
-        ]
+        params['run_cfgs'] = [{
+            'run_name': run_name,
+            'factor': factor,
+            'group': group,
+            'out_group': out_group,
+            'group_name': group_name,
+            'out_group_name': out_group_name,
+            'min_abundance': min_abundance,
+            'max_out_presence': max_out_presence,
+            'name': group_name,
+            'max_p': max_p,
+            'min_frac': min_frac,
+            'p_val_adj': p_val_adj,
+            'make_relative': make_relative,
+        }]
 
         if include_out:
             params['run_cfgs'].append({
@@ -118,8 +119,8 @@ class MainPage(webapp2.RequestHandler):
                 'max_p': max_p,
                 'min_frac': min_frac,
                 'p_val_adj': p_val_adj,
-                }
-            )
+                'make_relative': make_relative,
+            })
 
         template = web_config.JINJA_ENVIRONMENT.get_template('result.html')
         if len(errors_list) > 0:
