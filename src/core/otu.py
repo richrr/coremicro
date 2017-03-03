@@ -87,10 +87,3 @@ class Otu:
         return (self.interest_frac == other.interest_frac and
                 self.corrected_pval == other.corrected_pval and
                 self.name == other.name)
-
-    def __str__(self):
-        """Print summary of OTU as TSV line. pval and corrected_pval must have
-        been added first"""
-        return '\t'.join(map(str, [self.name, self.pval, self.corrected_pval,
-                                   self.interest_frac,
-                                   self.out_frac]))

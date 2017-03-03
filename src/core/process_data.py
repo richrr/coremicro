@@ -43,18 +43,25 @@ def process(inputs, cfg):
 
 
 def format_results(res, cfg):
-    """Format the result data as a tsv
-    """
-    inputs = '#' + '\t'.join(['Factor: ' + cfg['factor'],
-                              'Group: ' + ', '.join(cfg['group']),
-                              'Max Corrected p-val: %f' % cfg['max_p'],
-                              'Min Presence: %f' % cfg['min_frac'],
-                              'Max Out Presence: %f' % cfg['max_out_presence'],
-                              'Min Abundance: %f' % cfg['min_abundance'],
-                              'Correction Type: ' + cfg['p_val_adj'],
-                              ])
-    header = '#' + '\t'.join(['OTU', 'Pval', 'Corrected Pval',
-                              'Interest Group Presence', 'Out Group Presence'])
-    # logging.info("Results for configuration: " + cfg['name'])
-    return '\n'.join([inputs, header] +
-                     [str(otu) for otu in list(sorted(res))])
+    """Format the result data as a tsv"""
+    # Summary of the inputs given
+    inputs = ['#Factor: ' + cfg['factor'],
+              'Group: ' + ', '.join(cfg['group']),
+              'Max Corrected p-val: %f' % cfg['max_p'],
+              'Min Presence: %f' % cfg['min_frac'],
+              'Max Out Presence: %f' % cfg['max_out_presence'],
+              'Min Abundance: %f' % cfg['min_abundance'],
+              'Correction Type: ' + cfg['p_val_adj']]
+    # Header for results
+    header = ['#OTU', 'Pval', 'Corrected Pval', 'Interest Group Presence',
+              'Out Group Presence']
+    # Combine inputs, header, and information from core OTUs
+    return to_tsv([inputs, header] +
+                  [[otu.name, otu.pval, otu.corrected_pval, otu.interest_frac,
+                    otu.out_frac] for otu in list(sorted(res))])
+
+
+def to_tsv(values):
+    """Formats the given list of lists as a tsv string. str() is called on
+    all items to convert them to strings"""
+    return '\n'.join(map(lambda r: '\t'.join(map(str, r)), values))
