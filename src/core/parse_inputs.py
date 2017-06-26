@@ -19,6 +19,8 @@
 
 from biom.parse import parse_biom_table
 from biom.table import table_factory, SparseOTUTable
+from numpy import array, append
+from itertools import groupby
 
 # groupfile delimitere
 DELIM = '\t'
@@ -29,7 +31,6 @@ def read_table(table_file, normalize=False):
     """
     parsed_table = parse_biom_table(table_file)
     sample_ids = parsed_table.SampleIds
-    original_otus = len(parsed_table.ObservationIds)
     otu_data = dict()
     for vals, id, md in parsed_table.iterObservations():
         otu = md['taxonomy']
@@ -45,7 +46,35 @@ def read_table(table_file, normalize=False):
     if (normalize):
         data = normalize_columns(data)
     return table_factory(data, sample_ids, observation_ids,
-                         constructor=SparseOTUTable), original_otus
+                         constructor=SparseOTUTable)
+
+
+def combine_tables(tables):
+    """Combines multiple biom tables into a signle table, discarding any
+    non-shared OTUs.
+    """
+    samples = [sample for sample_list in [table.SampleIds for table in tables]
+               for sample in sample_list]
+    duplicate_sample_indices = [
+        index for indices in [[index for index, value in indices][1:]
+                              for sample, indices
+                              in groupby(sorted(enumerate(samples),
+                                                key=lambda x: x[1]),
+                                         lambda x: x[1])]
+        for index in indices]
+    otu_data = dict()
+    for table in tables:
+        for vals, otu, md in table.iterObservations():
+            if otu_data.get(otu) is not None:
+                otu_data[otu] = append(otu_data[otu], vals)
+            else:
+                otu_data[otu] = vals
+    otus = [otu for otu in otu_data if len(otu_data[otu]) == len(samples)]
+    data = [array([v for i, v in enumerate(otu_data[otu])
+                   if i not in duplicate_sample_indices]) for otu in otus]
+    samples = [v for i, v in enumerate(samples)
+               if i not in duplicate_sample_indices]
+    return table_factory(data, samples, otus, constructor=SparseOTUTable)
 
 
 def normalize_columns(data):
@@ -83,7 +112,7 @@ def parse_groupfile(groupfile, factor):
     return local_dict
 
 
-def parse_inputs(params, groupfile, data):
+def parse_inputs(params, groupfile, datafiles):
     """Validate that the given inputs are usable and parse them into usable
     formats"""
 
@@ -102,10 +131,12 @@ def parse_inputs(params, groupfile, data):
     [out_group.remove(l) for l in params['group']]
 
     try:
-        filtered_data, original_otus = read_table(data,
-                                                  params['make_relative'])
+        filtered_data = combine_tables(map(
+            lambda table: read_table(table, params['make_relative']),
+            datafiles))
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)
+        filtered_data = None
 
     if params['max_p'] < 0 or params['max_p'] > 1:
         errors_list.append('Maximum p-value must be in the range zero to one')
@@ -117,4 +148,4 @@ def parse_inputs(params, groupfile, data):
                            ' zero to one')
     # Should verify p-value-adjust is valid value
 
-    return (errors_list, mapping_dict, out_group, filtered_data, original_otus)
+    return (errors_list, mapping_dict, out_group, filtered_data)
