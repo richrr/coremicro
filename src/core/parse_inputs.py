@@ -26,7 +26,7 @@ from itertools import groupby
 DELIM = '\t'
 
 
-def read_table(table_file, normalize=False):
+def read_table(table_file, normalize=False, do_quantile_normalize=False):
     """Read in the input datafile and combine any doubled OTUs
     """
     parsed_table = parse_biom_table(table_file)
@@ -43,8 +43,10 @@ def read_table(table_file, normalize=False):
 
     observation_ids = otu_data.keys()
     data = [otu_data[o] for o in observation_ids]
-    if (normalize):
+    if normalize:
         data = normalize_columns(data)
+    if do_quantile_normalize:
+        data = quantile_normalize(data)
     return table_factory(data, sample_ids, observation_ids,
                          constructor=SparseOTUTable)
 
@@ -85,6 +87,25 @@ def normalize_columns(data):
         for row in data:
             row[i] = row[i] / float(total)
     return data
+
+
+def quantile_normalize(data):
+    """Quantile normalize the data"""
+    columns = [[row[i] for row in data] for i in range(len(data[0]))]
+    sorted_columns = [sorted(column) for column in columns]
+    distribution = [(sum([column[i] for column in sorted_columns]) /
+                     len(sorted_columns))
+                    for i in range(len(sorted_columns[0]))]
+    result = [
+        [newval for newval, column_i
+         in sorted([(distribution[dist_i], column_i)
+                    for dist_i, (column_i, val)
+                    in enumerate(sorted(enumerate(column),
+                                        key=lambda x: x[1]))],
+                   key=lambda x: x[1])]
+        for column in columns]
+    return [array([column[i] for column in result])
+            for i in range(len(result[0]))]
 
 
 def parse_groupfile(groupfile, factor):
@@ -132,7 +153,8 @@ def parse_inputs(params, groupfile, datafiles):
 
     try:
         filtered_data = combine_tables(map(
-            lambda table: read_table(table, params['make_relative']),
+            lambda table: read_table(table, params['make_relative'],
+                                     params['quantile_normalize']),
             datafiles))
     except ValueError as e:
         errors_list.append('Datafile could not be read: %s' % e.message)

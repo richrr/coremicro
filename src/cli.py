@@ -69,6 +69,14 @@ def setup_parser():
                               'each sample. If this is set then the maximum ' +
                               'absent abundance should also be a relative ' +
                               '(0 to 1) value.'))
+    parser.add_argument('-q', '--quantile-normalize',
+                        dest='quantile_normalize',
+                        action='store_true',
+                        help=('Quantile normalize the columns of the input ' +
+                              'datatable before processing. This will occur ' +
+                              'after relativising if both are selected. ' +
+                              'Ties are broken in an arbitrary but ' +
+                              'deterministic fashion.'))
     parser.set_defaults(relative=False)
     return parser
 
@@ -91,6 +99,7 @@ if __name__ == '__main__':
         'max_out_presence': args.max_out_presence,
         'p_val_adj': args.p_val_correction,
         'make_relative': args.relative,
+        'quantile_normalize': args.quantile_normalize,
     }
     errors_list, mapping_dict, out_group, filtered_data = parse_inputs(
         cfg, groupfile, datafiles)
