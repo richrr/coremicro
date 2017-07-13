@@ -50,6 +50,7 @@ class MainPage(webapp2.RequestHandler):
         min_frac = float(self.request.get('min_frac'))
         max_out_presence = float(self.request.get('max_out_presence'))
         make_relative = bool(self.request.get('make_relative'))
+        quantile_normalize = bool(self.request.get('quantile_normalize'))
         min_abundance = float(self.request.get('min_abundance'))
 
         to_email = self.request.get('email')
@@ -70,6 +71,7 @@ class MainPage(webapp2.RequestHandler):
             'min_frac': min_frac,
             'max_out_presence': max_out_presence,
             'make_relative': make_relative,
+            'quantile_normalize': quantile_normalize,
         }
 
         errors_list, mapping_dict, out_group, filtered_data = parse_inputs(
@@ -96,6 +98,7 @@ class MainPage(webapp2.RequestHandler):
             'min_frac': min_frac,
             'p_val_adj': p_val_adj,
             'make_relative': make_relative,
+            'quantile_normalize': quantile_normalize,
         }]
 
         if include_out:
@@ -113,6 +116,7 @@ class MainPage(webapp2.RequestHandler):
                 'min_frac': min_frac,
                 'p_val_adj': p_val_adj,
                 'make_relative': make_relative,
+                'quantile_normalize': quantile_normalize,
             })
 
         template = web_config.JINJA_ENVIRONMENT.get_template('result.html')

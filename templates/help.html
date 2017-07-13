@@ -186,6 +186,12 @@ These are some of the options that need to provided:
     The values will be adjusted such that the sum of the abundances for
     each sample adds up to 1. Note that if this is checked the Minimum
     Abundance should be specified as a relative (0 to 1) abundance as well.</dd>
+
+  <dt>Quantile Normalize</dt>
+  <dd>If this is checked then Quantile normalize the columns of the input
+    datatable before processing. This will occur after relativising if both
+    are selected. Ties are broken in an arbitrary but deterministic
+    fashion.</dd>
   
   <dt>Minimum Abundance</dt>
   <dd>The minimum abundance a measurement must have to be considered present.
