@@ -72,10 +72,13 @@ def combine_tables(tables):
             else:
                 otu_data[otu] = vals
     otus = [otu for otu in otu_data if len(otu_data[otu]) == len(samples)]
+    if not otus:
+        raise ValueError('No shared OTUs')
     data = [array([v for i, v in enumerate(otu_data[otu])
                    if i not in duplicate_sample_indices]) for otu in otus]
     samples = [v for i, v in enumerate(samples)
                if i not in duplicate_sample_indices]
+
     return table_factory(data, samples, otus, constructor=SparseOTUTable)
 
 
@@ -141,15 +144,16 @@ def parse_inputs(params, groupfile, datafiles):
 
     try:
         mapping_dict = parse_groupfile(groupfile, params['factor'])
+        for l in params['group']:
+            if l not in mapping_dict.keys():
+                errors_list.append(
+                    'Interest group label %s is not in groupfile' % l)
+
+        out_group = mapping_dict.keys()
+        [out_group.remove(l) for l in params['group']]
     except ValueError as e:
         errors_list.append(e.message)
-    for l in params['group']:
-        if l not in mapping_dict.keys():
-            errors_list.append(
-                'Interest group label %s is not in groupfile' % l)
-
-    out_group = mapping_dict.keys()
-    [out_group.remove(l) for l in params['group']]
+        mapping_dict = dict()
 
     try:
         filtered_data = combine_tables(map(
