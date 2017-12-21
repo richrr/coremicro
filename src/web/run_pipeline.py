@@ -72,11 +72,12 @@ class RunPipeline(pipeline.Pipeline):
             attachments += generate_graph(inputs, cfg, core)
         elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
             strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-        send_email(SUCCESS_EMAIL_SUBJ % params['run_name'],
-                   SUCCESS_EMAIL % (params['user_args'],
-                                    elapsed_time.seconds,
-                                    elapsed_time.microseconds),
-                   params['to_email'], attachments)
+        for email in params['emails']:
+            send_email(SUCCESS_EMAIL_SUBJ % params['run_name'],
+                       SUCCESS_EMAIL % (params['user_args'],
+                                        elapsed_time.seconds,
+                                        elapsed_time.microseconds),
+                       email, attachments)
 
     def finalized(self):
         logging.info('Finalizing task')
@@ -88,11 +89,12 @@ class RunPipeline(pipeline.Pipeline):
             logging.warn(error)
             elapsed_time = datetime.now() - datetime.fromtimestamp(mktime(
                 strptime(params['timestamp'], '%a-%d-%b-%Y-%I:%M:%S-%p')))
-            send_email(FAILURE_EMAIL_SUBJ % params['run_name'],
-                       FAILURE_EMAIL % (
-                           params['user_args'],
-                           elapsed_time.seconds,
-                           elapsed_time.microseconds,
-                           error),
-                       params['to_email'])
+            for email in params['emails']:
+                send_email(FAILURE_EMAIL_SUBJ % params['run_name'],
+                           FAILURE_EMAIL % (
+                               params['user_args'],
+                               elapsed_time.seconds,
+                               elapsed_time.microseconds,
+                               error),
+                           email)
         self.cleanup()

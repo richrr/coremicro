@@ -22,8 +22,10 @@
 {% if sucess %}
 <h1>Submission Sucessful</h1>
 <p>
-  Your results will be emailed to <a href="mail:{{ user_email }}">
-    {{user_email}}</a>
+  Your results will be emailed to
+{% for email in user_emails %}
+  <a href="mail:{{email}}">{{email}}</a>{{ "," if not loop.last }}
+{% endfor %}
   soon.
 </p>
 <p>Click <a href="/">here</a> to return to the form.</p>

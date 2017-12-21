@@ -53,7 +53,7 @@ class MainPage(webapp2.RequestHandler):
         quantile_normalize = bool(self.request.get('quantile_normalize'))
         min_abundance = float(self.request.get('min_abundance'))
 
-        to_email = self.request.get('email')
+        emails = map(lambda s: s.strip(), self.request.get('email').split(','))
 
         user_args = (('You selected the following parameters:' +
                       '\nFactor: %s\nGroup: %s\n' +
@@ -62,7 +62,7 @@ class MainPage(webapp2.RequestHandler):
 
         params = {
             'run_name': run_name,
-            'to_email': to_email,
+            'emails': emails,
             'timestamp': timestamp,
             'user_args': user_args,
             'factor': factor,
@@ -128,4 +128,4 @@ class MainPage(webapp2.RequestHandler):
         pipeline = RunPipeline(params, inputs)
         pipeline.start()
 
-        self.response.write(template.render(user_email=to_email, sucess=True))
+        self.response.write(template.render(user_emails=emails, sucess=True))
