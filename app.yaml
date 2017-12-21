@@ -51,5 +51,5 @@ libraries:
 - name: jinja2
   version: "2.6"
 - name: ssl
-  version: "2.7"
+  version: "2.7.11"
 
