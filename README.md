@@ -6,3 +6,6 @@ After cloning, the dependencies can be installed by running `make install` from 
 
 # Testing and Deploying
 `make devel` will start the development server, and `make deploy` will deploy to GAE. You must have first installed all dependencies for these to work. Before running `make deploy` change `GAE_PROJECT_NAME` in the makefile to your GAE project name.
+
+# Email Configuration
+The web version of this tool delivers its results via email. To configure this create `src/web/email_config.py`, which should look like the `example_email_config.py` in that same directory, replacing the keys and from address with the keys for your Mailjet account and the email with the email you wish to send the results from (make sure this is set up with Mailjet as well)!
