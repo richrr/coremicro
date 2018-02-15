@@ -127,7 +127,10 @@ def parse_groupfile(groupfile, factor):
     for l in groupfile:
         if not l or l.strip()[0] == '#':  # Line is blank or comment
             continue
-        key, val = map(l.strip().split(DELIM).__getitem__,
+        split_line = l.strip().split(DELIM)
+        if len(split_line) <= max(index_sampleid, index_categ):
+            raise ValueError("Malformed groupfile")
+        key, val = map(split_line.__getitem__,
                        [index_categ, index_sampleid])
         if key in local_dict:
             local_dict[key].append(val)
@@ -154,6 +157,7 @@ def parse_inputs(params, groupfile, datafiles):
     except ValueError as e:
         errors_list.append(e.message)
         mapping_dict = dict()
+        out_group = None
 
     try:
         filtered_data = combine_tables(map(
