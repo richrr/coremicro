@@ -17,6 +17,6 @@
 # along with Coremic. If not, see <http://www.gnu.org/licenses/>.
 GoogleAppEnginePipeline==1.9.22.1
 pyqi==0.3.1
-requests==2.20.0
+requests==2.31.0
 requests-toolbelt==0.6.2
 mailjet-rest==v1.2.2
